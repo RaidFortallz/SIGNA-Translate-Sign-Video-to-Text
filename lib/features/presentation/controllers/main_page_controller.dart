@@ -7,7 +7,7 @@ class MainPageController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    Future.delayed(const Duration(milliseconds: 400), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       hideCircle.value = true;
     });
   }

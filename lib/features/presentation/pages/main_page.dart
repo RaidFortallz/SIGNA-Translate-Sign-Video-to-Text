@@ -29,7 +29,7 @@ class MainPage extends StatelessWidget {
           child: Obx(
             () => AnimatedScale(
               scale: controller.hideCircle.value ? 0.01 : 25,
-              duration: const Duration(milliseconds: 1200),
+              duration: const Duration(milliseconds: 1000),
               curve: Curves.easeOut,
               alignment: Alignment.center,
               child: Container(

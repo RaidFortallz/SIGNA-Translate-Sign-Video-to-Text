@@ -4,8 +4,8 @@ import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
 
-class TranslateSignPage extends StatelessWidget {
-  const TranslateSignPage({super.key});
+class ResultPage extends StatelessWidget {
+   const ResultPage({super.key});
 
   @override
   Widget build(BuildContext context) {
