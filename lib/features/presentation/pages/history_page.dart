@@ -17,7 +17,7 @@ class HistoryPage extends StatelessWidget {
             width: double.infinity.w,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: BoxBorder.all(width: 2.5, color: WarnaApp.wrBlue),
+              border: BoxBorder.all(width: 1.5, color: WarnaApp.wrBlue),
               color: WarnaApp.wrWhite,
             ),
             child: Padding(
@@ -94,7 +94,7 @@ class HistoryPage extends StatelessWidget {
             width: double.infinity.w,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: BoxBorder.all(width: 2.5, color: WarnaApp.wrBlue),
+              border: BoxBorder.all(width: 1.5, color: WarnaApp.wrBlue),
               color: WarnaApp.wrWhite,
             ),
             child: Padding(

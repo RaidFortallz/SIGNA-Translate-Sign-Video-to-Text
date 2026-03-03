@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1036855417308",
+    "project_id": "signa-sign-translate-app",
+    "storage_bucket": "signa-sign-translate-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1036855417308:android:b895ccc0e600a3e2569719",
+        "android_client_info": {
+          "package_name": "com.example.signa_video_to_text"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8Z70DC6UCayrpeDy7nQN18vQkyIxxbzQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
