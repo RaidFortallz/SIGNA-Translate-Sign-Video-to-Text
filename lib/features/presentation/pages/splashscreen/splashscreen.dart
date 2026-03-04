@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:lottie/lottie.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
+import 'package:signa_video_to_text/features/presentation/controllers/auth_controller.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/splashscreen_controller.dart';
 
 class Splashscreen extends StatelessWidget {
   final controller = Get.find<SplashscreenController>();
+  final authController = Get.find<AuthController>();
   Splashscreen({super.key});
 
   @override
