@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/domain/entities/translation_entity.dart';
 import 'package:signa_video_to_text/features/domain/usecases/delete_history_usecase.dart';
 import 'package:signa_video_to_text/features/domain/usecases/get_history_usecase.dart';
@@ -34,7 +35,7 @@ class TranslationController extends GetxController {
 
       if (result != null && result.files.single.path != null) {
         String videoPath = result.files.single.path!;
-        await _processVideoPath(videoPath);
+        await processVideoPath(videoPath);
       }
     } catch (e) {
       Get.snackbar('Error Upload', e.toString());
@@ -42,7 +43,7 @@ class TranslationController extends GetxController {
   }
 
   Future<void> recordVideo() async {
-    // Get.toNamed('/camera_page');
+    Get.toNamed(RouteNames.record);
     print("Membuka halaman CameraAwesome...");
   }
 
@@ -58,7 +59,7 @@ class TranslationController extends GetxController {
     }
   }
 
-  Future<void> _processVideoPath(String path) async {
+  Future<void> processVideoPath(String path) async {
     try {
       isLoading.value = true;
       currentResult.value = null;

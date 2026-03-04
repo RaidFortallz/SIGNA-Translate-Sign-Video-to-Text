@@ -4,10 +4,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
+import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
 
 class CameraPage extends StatelessWidget {
-  const CameraPage({super.key});
+  final controller = Get.find<TranslationController>();
+
+  CameraPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +75,23 @@ class CameraPage extends StatelessWidget {
           aspectRatio: CameraAspectRatios.ratio_16_9,
           // zoom: 0.0,
         ),
+
+        onMediaCaptureEvent: (event) {
+          if (event.status == MediaCaptureStatus.success &&
+              event.isPicture == false) {
+            event.captureRequest.when(
+              single: (single) {
+                final videoPath = single.file?.path;
+                if (videoPath != null) {
+                  controller.processVideoPath(videoPath);
+                  Get.offNamed(RouteNames.result);
+                }
+              },
+              multiple: (multiple) => null,
+            );
+          }
+        },
+
         builder: (cameraState, previewSize) {
           bool isRecording = false;
           VoidCallback? onRecordTap;
@@ -80,17 +100,13 @@ class CameraPage extends StatelessWidget {
             onPreparingCamera: (state) => null,
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
-              isRecording =
-              false;
-              onRecordTap =
-              () => videoState.startRecording();
+              isRecording = false;
+              onRecordTap = () => videoState.startRecording();
             },
 
             onVideoRecordingMode: (recordingState) {
-              isRecording =
-              true;
-              onRecordTap =
-              () => recordingState.stopRecording();
+              isRecording = true;
+              onRecordTap = () => recordingState.stopRecording();
             },
           );
 
@@ -107,7 +123,10 @@ class CameraPage extends StatelessWidget {
                   onPhotoMode: (_) => const SizedBox.shrink(),
                 ),
               ),
-              _buildBottomControls(isRecording: isRecording, onRecordTap: onRecordTap ?? () {})
+              _buildBottomControls(
+                isRecording: isRecording,
+                onRecordTap: onRecordTap ?? () {},
+              ),
             ],
           );
         },
@@ -183,7 +202,7 @@ Widget _buildBottomControls({
             height: isRecording ? 50.w : 60.w,
             decoration: BoxDecoration(
               shape: BoxShape.rectangle,
-              borderRadius:BorderRadius.circular(isRecording ? 16 : 100),
+              borderRadius: BorderRadius.circular(isRecording ? 16 : 100),
               color: WarnaApp.wrRed,
               border: Border.all(color: WarnaApp.wrWhite, width: 4),
               boxShadow: [
@@ -200,16 +219,15 @@ Widget _buildBottomControls({
                     ? Icons.stop_rounded
                     : Icons.fiber_manual_record_rounded,
                 color: WarnaApp.wrWhite,
-                size: 30.sp ,
+                size: 30.sp,
               ),
             ),
           ),
         ),
-        
+
         SizedBox(height: 14.h),
         TextCustom(
-          isRecording ? "Sedang merekam..." :
-          "Ketuk untuk mulai rekam",
+          isRecording ? "Sedang merekam..." : "Ketuk untuk mulai rekam",
           fontSize: 14,
           color: WarnaApp.wrTextBlack,
         ),

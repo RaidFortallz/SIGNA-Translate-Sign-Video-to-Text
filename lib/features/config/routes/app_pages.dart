@@ -20,6 +20,6 @@ class AppPages {
       binding: MainPageBinding(),
     ),
     GetPage(name: RouteNames.record, page: () => CameraPage()),
-    GetPage(name: RouteNames.translate, page: () => ResultPage()),
+    GetPage(name: RouteNames.result, page: () => ResultPage()),
   ];
 }

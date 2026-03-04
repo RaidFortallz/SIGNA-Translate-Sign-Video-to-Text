@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
+import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final controller = Get.find<TranslationController>();
+
+  HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +52,9 @@ class HomePage extends StatelessWidget {
                   color: WarnaApp.wrTextBlack,
                 ),
                 SizedBox(height: 44.h),
+
                 InkWell(
-                  onTap: () => Get.toNamed(RouteNames.record),
+                  onTap: () => controller.recordVideo(),
                   borderRadius: BorderRadius.circular(100),
                   child: Container(
                     width: 96.w,
@@ -89,7 +92,7 @@ class HomePage extends StatelessWidget {
                 ),
 
                 IconButton(
-                  onPressed: () {},
+                  onPressed: controller.uploadVideo,
                   icon: Icon(
                     Icons.drive_folder_upload,
                     size: 53.sp,
@@ -110,7 +113,9 @@ class HomePage extends StatelessWidget {
           top: 44.w,
           width: 74.w,
           child: IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Get.snackbar("Info", "Posisikan tubuh di tengah kamera saat merekam.");
+            },
             icon: Icon(Icons.info_outline_rounded, size: 32),
             color: WarnaApp.wrBlue,
             splashRadius: 24,

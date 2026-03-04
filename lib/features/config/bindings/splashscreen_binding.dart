@@ -10,11 +10,17 @@ class SplashscreenBinding implements Bindings {
   @override
   void dependencies() {
     Get.put(SplashscreenController());
+
+    //Data Layer
     Get.put(FirebaseDataSources());
+
+    //Domain Layer
     Get.put<IAuthRepository>(
       AuthRepositoryImpl(dataSource: Get.find<FirebaseDataSources>()),
     );
     Get.put(SignInUsecase(repo: Get.find<IAuthRepository>()));
+
+    //Presentation Layer
     Get.put(AuthController(signinUC: Get.find<SignInUsecase>()));
   }
 }
