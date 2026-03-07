@@ -16,7 +16,7 @@ class MainPageBinding implements Bindings {
     Get.put(MainPageController());
 
     //Data Layer
-    Get.put(FirebaseDataSources());
+    // Get.put(FirebaseDataSources());
     Get.put(LocalFileDataSource());
     Get.put(TfliteDataSources());
 

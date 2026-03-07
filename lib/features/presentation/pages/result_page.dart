@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
+import 'package:signa_video_to_text/features/presentation/widgets/video_preview_widget.dart';
 
 class ResultPage extends StatelessWidget {
   final controller = Get.find<TranslationController>();
@@ -35,10 +37,21 @@ class ResultPage extends StatelessWidget {
 
         if (data == null) {
           return Center(
-            child: TextCustom(
-              "Gagal menerjemahkan video.",
-              fontSize: 18,
-              color: WarnaApp.wrRed,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline_outlined,
+                  size: 80.sp,
+                  color: WarnaApp.wrGrey.withValues(alpha: 0.6),
+                ),
+                SizedBox(height: 16.h),
+                TextCustom(
+                  "Gagal menerjemahkan video.",
+                  fontSize: 18,
+                  color: WarnaApp.wrRed,
+                ),
+              ],
             ),
           );
         }
@@ -65,11 +78,8 @@ class ResultPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   color: WarnaApp.wrGrey,
                 ),
-                child: Icon(
-                  Icons.play_circle_outline,
-                  size: 62,
-                  color: WarnaApp.wrWhite,
-                ),
+                clipBehavior: Clip.hardEdge,
+                child: VideoPreviewWidget(videoPath: data.videoPath),
               ),
               SizedBox(height: 38),
               Center(
@@ -179,7 +189,7 @@ class ResultPage extends StatelessWidget {
                         children: [
                           Center(
                             child: Icon(
-                              Icons.videocam_outlined,
+                              Icons.videocam_outlined,                                                                                                                                                                               
                               size: 38,
                               color: WarnaApp.wrWhite,
                             ),

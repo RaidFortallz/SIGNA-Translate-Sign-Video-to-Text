@@ -19,7 +19,7 @@ class AuthController extends GetxController {
       await signinUC.execute();
       print("Berhasil login Anonymous! UID sudah siap digunakan");
 
-      // Get.toNamed('');
+      
     } catch (e) {
       print("Gagal login Anonymous: $e");
       Get.snackbar('Error Login', 'Gagal menyambung ke server. Detail: $e');

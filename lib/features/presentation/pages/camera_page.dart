@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,10 +9,43 @@ import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
 
-class CameraPage extends StatelessWidget {
+class CameraPage extends StatefulWidget {
+  const CameraPage({super.key});
+
+  @override
+  State<CameraPage> createState() => _CameraPageState();
+}
+
+class _CameraPageState extends State<CameraPage> {
   final controller = Get.find<TranslationController>();
 
-  CameraPage({super.key});
+  Timer? _timer;
+  int _recordDuration = 0;
+
+  void _startTimer() {
+    _recordDuration = 0;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _recordDuration++;
+      });
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+  }
+
+  String _formatDuration(int seconds) {
+    final m = (seconds / 60).floor().toString().padLeft(1, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return "$m:$s";
+  }
+
+  @override
+  void dispose() {
+    _stopTimer();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +88,7 @@ class CameraPage extends StatelessWidget {
                 ),
                 SizedBox(width: 6.h),
                 TextCustom(
-                  "00:05",
+                  _formatDuration(_recordDuration),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: WarnaApp.wrRed,
@@ -101,12 +136,27 @@ class CameraPage extends StatelessWidget {
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
               isRecording = false;
-              onRecordTap = () => videoState.startRecording();
+              onRecordTap = () {
+                videoState.startRecording();
+                _startTimer();
+              };
             },
 
             onVideoRecordingMode: (recordingState) {
               isRecording = true;
-              onRecordTap = () => recordingState.stopRecording();
+              onRecordTap = () {
+                if (_recordDuration < 2) {
+                  Get.snackbar(
+                    "Terlalu Singkat",
+                    "Durasi rekaman minimal 2 detika",
+                    backgroundColor: WarnaApp.wrRed,
+                    colorText: WarnaApp.wrWhite,
+                  );
+                  return;
+                }
+                recordingState.stopRecording();
+                _stopTimer();
+              };
             },
           );
 
@@ -117,8 +167,8 @@ class CameraPage extends StatelessWidget {
                   onPreparingCamera: (_) => const Center(
                     child: CircularProgressIndicator(color: WarnaApp.wrRed),
                   ),
-                  onVideoMode: (state) => _buildTopOverlay(state),
-                  onVideoRecordingMode: (state) => _buildTopOverlay(state),
+                  onVideoMode: (state) => _buildTopOverlay(state, isRecording),
+                  onVideoRecordingMode: (state) => _buildTopOverlay(state, isRecording),
 
                   onPhotoMode: (_) => const SizedBox.shrink(),
                 ),
@@ -135,7 +185,7 @@ class CameraPage extends StatelessWidget {
   }
 }
 
-Widget _buildTopOverlay(CameraState state) {
+Widget _buildTopOverlay(CameraState state, bool isRecording) {
   return Stack(
     children: [
       Positioned(
@@ -165,10 +215,10 @@ Widget _buildTopOverlay(CameraState state) {
         top: 20,
         right: 16,
         child: IconButton(
-          onPressed: () => state.switchCameraSensor(),
-          icon: const Icon(
+          onPressed: isRecording ? null : () => state.switchCameraSensor(),
+          icon:  Icon(
             Icons.cameraswitch_rounded,
-            color: WarnaApp.wrWhite,
+            color:  isRecording ? WarnaApp.wrGrey : WarnaApp.wrWhite,
             size: 30,
           ),
         ),

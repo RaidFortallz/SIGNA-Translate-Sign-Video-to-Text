@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -14,6 +14,10 @@ class TfliteDataSources {
   final int imgWidth = 112;
   final int imgHeight = 112;
 
+  TfliteDataSources() {
+    loadModel();
+  }
+
   Future<void> loadModel() async {
     try {
       interpreter = await Interpreter.fromAsset(
@@ -21,13 +25,19 @@ class TfliteDataSources {
       );
       print("Model 3D CNN berhasil di load");
     } catch (e) {
-      print("Gagal load model: $e");
+      print("Gagal load model: ${e.toString()}");
     }
   }
 
   Future<Map<String, dynamic>> runInference(String path) async {
     if (interpreter == null) {
-      throw Exception("Interpreter model belum siap!");
+      print("Interpreter model belum siap, nunggu loadModel() bentar...");
+      await loadModel();
+    }
+
+    if (interpreter == null) {
+      // print("File model .tflite tidak ketemu!");
+      throw Exception("File model .tflite tidak ketemu!");
     }
 
     try {
@@ -42,6 +52,8 @@ class TfliteDataSources {
 
       interpreter!.run(inputTensor, outputTensor);
 
+      print("Inference Selesai Cok! Lanjut hitung akurasi...");
+
       List<double> predictions = outputTensor[0];
 
       int maxIndex = 0;
@@ -54,7 +66,12 @@ class TfliteDataSources {
         }
       }
 
-      return {'label': labels[maxIndex], 'confidence': maxConfidence * 100};
+      double finalConfidence = maxConfidence * 100;
+      if (finalConfidence < 80.0) {
+        return {'label': 'Gerakan Tidak Diketahui', 'confidence': finalConfidence};
+      }
+
+      return {'label': labels[maxIndex], 'confidence': finalConfidence};
     } catch (e) {
       throw Exception("Gagal melakukan inferensi: $e");
     }

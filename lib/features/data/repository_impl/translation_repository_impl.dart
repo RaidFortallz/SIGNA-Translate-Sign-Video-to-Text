@@ -37,7 +37,9 @@ class TranslationRepositoryImpl implements ITranslationRepository {
   @override
   Future<List<TranslationEntity>> getHistory() async {
     final uid = clouSource.getCurrentUid();
-    if (uid == null) throw Exception("Userbelum login");
+    if (uid == null) {
+      return [];
+    }
 
     final List<Map<String, dynamic>> rawData = await clouSource
         .fetchFromFirestore(uid);

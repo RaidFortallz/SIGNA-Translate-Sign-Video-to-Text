@@ -5,7 +5,7 @@ class SignInUsecase {
 
   SignInUsecase({required this.repo});
 
-  Future<void> execute() async { 
+  Future<void> execute() async {
     await repo.signInAnonimously();
   }
 }

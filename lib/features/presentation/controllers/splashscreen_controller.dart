@@ -11,7 +11,6 @@ class SplashscreenController extends GetxController {
     _started = true;
 
     final totalDuration = lottieDuration * 2.4;
-    // final totalDuration = lottieDuration * 1.6;
 
     // setelah animasi dari lottie diputar 2 kali -> munculin circle
     Future.delayed(totalDuration, () {
@@ -25,7 +24,7 @@ class SplashscreenController extends GetxController {
 
     // pindah halaman setelah circle muncul
     Future.delayed(totalDuration + const Duration(milliseconds: 1300), () {
-        Get.offAllNamed(RouteNames.main);
+      Get.offAllNamed(RouteNames.main);
     });
   }
 }

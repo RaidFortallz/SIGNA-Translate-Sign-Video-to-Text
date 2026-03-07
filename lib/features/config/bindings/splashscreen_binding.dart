@@ -12,15 +12,19 @@ class SplashscreenBinding implements Bindings {
     Get.put(SplashscreenController());
 
     //Data Layer
-    Get.put(FirebaseDataSources());
+    Get.put(FirebaseDataSources(), permanent: true);
 
     //Domain Layer
     Get.put<IAuthRepository>(
       AuthRepositoryImpl(dataSource: Get.find<FirebaseDataSources>()),
+      permanent: true
     );
-    Get.put(SignInUsecase(repo: Get.find<IAuthRepository>()));
+    Get.put(SignInUsecase(repo: Get.find<IAuthRepository>()), permanent: true);
 
     //Presentation Layer
-    Get.put(AuthController(signinUC: Get.find<SignInUsecase>()));
+    Get.put(
+      AuthController(signinUC: Get.find<SignInUsecase>()),
+      permanent: true,
+    );
   }
 }

@@ -114,7 +114,34 @@ class HomePage extends StatelessWidget {
           width: 74.w,
           child: IconButton(
             onPressed: () {
-              Get.snackbar("Info", "Posisikan tubuh di tengah kamera saat merekam.");
+              Get.snackbar(
+                "Tips Merekam",
+                "Pastikan gerakan tangan dan isyarat terlihat jelas di dalam frame kamera.",
+                backgroundColor: WarnaApp.wrWhite,
+                colorText: WarnaApp.wrTextBlack,
+                snackPosition: SnackPosition.TOP,
+                margin: EdgeInsets.only(top: 24.h, left: 16.w, right: 16.w),
+                borderRadius: 16,
+                borderWidth: 1.3,
+                borderColor: WarnaApp.wrBlue,
+                icon: Icon(
+                  Icons.lightbulb_outline_rounded,
+                  color: WarnaApp.wrOrange,
+                  size: 38.sp,
+                ),
+                shouldIconPulse: true,
+                boxShadows: [
+                  BoxShadow(
+                    color: WarnaApp.wrBlue.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
+                  )
+                ],
+                duration: const Duration(seconds: 3),
+                animationDuration: const Duration(milliseconds: 500),
+                forwardAnimationCurve: Curves.easeOutBack,
+              );
             },
             icon: Icon(Icons.info_outline_rounded, size: 32),
             color: WarnaApp.wrBlue,
