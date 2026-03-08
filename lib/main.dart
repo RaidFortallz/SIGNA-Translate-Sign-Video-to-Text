@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:signa_video_to_text/features/config/routes/app_pages.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
@@ -10,6 +11,7 @@ import 'package:signa_video_to_text/firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform

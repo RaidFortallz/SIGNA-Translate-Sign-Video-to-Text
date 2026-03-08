@@ -97,12 +97,15 @@ class ResultPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   color: WarnaApp.wrOrangeLight,
                 ),
-                child: TextCustom(
-                  data.text,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: WarnaApp.wrTextBlack,
-                  letterSpacing: 1,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TextCustom(
+                    data.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: WarnaApp.wrTextBlack,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
               SizedBox(height: 16),
@@ -154,7 +157,7 @@ class ResultPage extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => Get.offNamed(RouteNames.main),
                   child: Container(
-                    height: 88,
+                    height: 52,
                     width: 48,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
@@ -163,7 +166,7 @@ class ResultPage extends StatelessWidget {
                     child: Center(
                       child: Icon(
                         Icons.arrow_back_ios_new_outlined,
-                        size: 34,
+                        size: 22,
                         color: WarnaApp.wrWhite,
                       ),
                     ),
@@ -175,34 +178,30 @@ class ResultPage extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => Get.toNamed(RouteNames.record),
                   child: Container(
-                    height: 88,
+                    height: 52,
                     width: 196,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       color: WarnaApp.wrBlue,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-
-                        children: [
-                          Center(
-                            child: Icon(
-                              Icons.videocam_outlined,                                                                                                                                                                               
-                              size: 38,
-                              color: WarnaApp.wrWhite,
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          TextCustom(
-                            "Rekam Lagi",
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: WarnaApp.wrWhite,
-                          ),
-                        ],
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.videocam_outlined,
+                          size: 30,
+                          color: WarnaApp.wrWhite,
+                        ),
+                        SizedBox(width: 14),
+                        TextCustom(
+                          "Rekam Lagi",
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: WarnaApp.wrWhite,
+                        ),
+                      ],
                     ),
                   ),
                 ),

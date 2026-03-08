@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:camerawesome/pigeon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -18,6 +19,7 @@ class CameraPage extends StatefulWidget {
 
 class _CameraPageState extends State<CameraPage> {
   final controller = Get.find<TranslationController>();
+  bool _isProcessing = false;
 
   Timer? _timer;
   int _recordDuration = 0;
@@ -75,7 +77,7 @@ class _CameraPageState extends State<CameraPage> {
                   height: 8.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: WarnaApp.wrRed,
+                    color: WarnaApp.wrOrangeLight,
                   ),
                 ),
                 SizedBox(width: 6.h),
@@ -83,7 +85,7 @@ class _CameraPageState extends State<CameraPage> {
                   "REC",
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: WarnaApp.wrRed,
+                  color: WarnaApp.wrOrangeLight,
                   letterSpacing: 1.5,
                 ),
                 SizedBox(width: 6.h),
@@ -91,7 +93,7 @@ class _CameraPageState extends State<CameraPage> {
                   _formatDuration(_recordDuration),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: WarnaApp.wrRed,
+                  color: WarnaApp.wrOrangeLight,
                   letterSpacing: 1.5,
                 ),
               ],
@@ -101,23 +103,29 @@ class _CameraPageState extends State<CameraPage> {
       ),
       // CAMERA PREVIEW
       body: CameraAwesomeBuilder.custom(
-        saveConfig: SaveConfig.video(),
+        saveConfig: SaveConfig.video(
+          videoOptions: VideoOptions(enableAudio: false, quality: VideoRecordingQuality.hd)
+        ),
+        filter: AwesomeFilter.None,
         previewFit: CameraPreviewFit.cover,
 
         sensorConfig: SensorConfig.single(
           sensor: Sensor.position(SensorPosition.back),
           flashMode: FlashMode.none,
           aspectRatio: CameraAspectRatios.ratio_16_9,
+
           // zoom: 0.0,
         ),
 
         onMediaCaptureEvent: (event) {
+          if (_isProcessing) return;
           if (event.status == MediaCaptureStatus.success &&
               event.isPicture == false) {
             event.captureRequest.when(
               single: (single) {
                 final videoPath = single.file?.path;
                 if (videoPath != null) {
+                  _isProcessing = true;
                   controller.processVideoPath(videoPath);
                   Get.offNamed(RouteNames.result);
                 }
@@ -136,6 +144,7 @@ class _CameraPageState extends State<CameraPage> {
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
               isRecording = false;
+              videoState.sensorConfig.setBrightness(1.0);
               onRecordTap = () {
                 videoState.startRecording();
                 _startTimer();
@@ -168,7 +177,8 @@ class _CameraPageState extends State<CameraPage> {
                     child: CircularProgressIndicator(color: WarnaApp.wrRed),
                   ),
                   onVideoMode: (state) => _buildTopOverlay(state, isRecording),
-                  onVideoRecordingMode: (state) => _buildTopOverlay(state, isRecording),
+                  onVideoRecordingMode: (state) =>
+                      _buildTopOverlay(state, isRecording),
 
                   onPhotoMode: (_) => const SizedBox.shrink(),
                 ),
@@ -216,9 +226,9 @@ Widget _buildTopOverlay(CameraState state, bool isRecording) {
         right: 16,
         child: IconButton(
           onPressed: isRecording ? null : () => state.switchCameraSensor(),
-          icon:  Icon(
+          icon: Icon(
             Icons.cameraswitch_rounded,
-            color:  isRecording ? WarnaApp.wrGrey : WarnaApp.wrWhite,
+            color: isRecording ? WarnaApp.wrGrey : WarnaApp.wrWhite,
             size: 30,
           ),
         ),
@@ -246,14 +256,11 @@ Widget _buildBottomControls({
       children: [
         GestureDetector(
           onTap: onRecordTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: isRecording ? 50.w : 60.w,
-            height: isRecording ? 50.w : 60.w,
+          child: Container(
+            width: 70.w,
+            height: 70.w,
             decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(isRecording ? 16 : 100),
-              color: WarnaApp.wrRed,
+              shape: BoxShape.circle,
               border: Border.all(color: WarnaApp.wrWhite, width: 4),
               boxShadow: [
                 BoxShadow(
@@ -264,12 +271,14 @@ Widget _buildBottomControls({
               ],
             ),
             child: Center(
-              child: Icon(
-                isRecording
-                    ? Icons.stop_rounded
-                    : Icons.fiber_manual_record_rounded,
-                color: WarnaApp.wrWhite,
-                size: 30.sp,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: isRecording ? 26.w : 52.w,
+                height: isRecording ? 26.w : 52.w,
+                decoration: BoxDecoration(
+                  color: WarnaApp.wrRed,
+                  borderRadius: BorderRadius.circular(isRecording ? 6 : 100),
+                ),
               ),
             ),
           ),

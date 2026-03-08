@@ -20,12 +20,30 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
   @override
   void initState() {
     super.initState();
-    _videoController = VideoPlayerController.file(File(widget.videoPath))
-      ..initialize().then((_) {
-        setState(() {
-          _isInitialized = true;
-        });
-      });
+
+    final file = File(widget.videoPath);
+    if (!file.existsSync()) {
+      print("File video tidak ditemukan: ${widget.videoPath}");
+      return;
+    }
+
+    _videoController =
+        VideoPlayerController.file(
+            file,
+            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+          )
+          ..initialize()
+              .then((_) {
+                if (mounted) {
+                  setState(() {
+                    _isInitialized = true;
+                  });
+                }
+              })
+              .catchError((e) {
+                print("Gagal init video: $e");
+                if (mounted) setState(() => _isInitialized = false);
+              });
   }
 
   @override
@@ -36,6 +54,12 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!File(widget.videoPath).existsSync()) {
+      return const Center(
+        child: Icon(Icons.videocam_off, color: WarnaApp.wrGrey, size: 40),
+      );
+    }
+
     if (!_isInitialized) {
       return const Center(
         child: CircularProgressIndicator(color: WarnaApp.wrWhite),

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -8,7 +10,7 @@ import 'package:image/image.dart' as img;
 class TfliteDataSources {
   Interpreter? interpreter;
 
-  final List<String> labels = ['Halo', 'Minum', 'Terima Kasih'];
+  List<String> labels = [];
 
   final int targetFrames = 16;
   final int imgWidth = 112;
@@ -24,20 +26,24 @@ class TfliteDataSources {
         'assets/model/3dcnn_model.tflite',
       );
       print("Model 3D CNN berhasil di load");
+
+      final String jsonString = await rootBundle.loadString('assets/model/classes.json');
+      final List<dynamic> jsonResponse = json.decode(jsonString);
+      labels = jsonResponse.cast<String>();
+      print("Labels JSON berhasil di-load. Jumlah kata: ${labels.length}");
     } catch (e) {
-      print("Gagal load model: ${e.toString()}");
+      print("Gagal load model atau labels: ${e.toString()}");
     }
   }
 
   Future<Map<String, dynamic>> runInference(String path) async {
-    if (interpreter == null) {
-      print("Interpreter model belum siap, nunggu loadModel() bentar...");
+    if (interpreter == null || labels.isEmpty) {
+      print("Interpreter model atau label belum siap, nunggu loadModel() bentar...");
       await loadModel();
     }
 
-    if (interpreter == null) {
-      // print("File model .tflite tidak ketemu!");
-      throw Exception("File model .tflite tidak ketemu!");
+    if (interpreter == null || labels.isEmpty) {
+      throw Exception("File model .tflite atau classes.json tidak ketemu!");
     }
 
     try {
