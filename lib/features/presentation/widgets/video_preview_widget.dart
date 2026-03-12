@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
-import 'package:video_player/video_player.dart';
+import 'package:signa_video_to_text/features/presentation/widgets/semifullscreen_video_widget.dart';
 
 class VideoPreviewWidget extends StatefulWidget {
   final String videoPath;
@@ -14,85 +14,61 @@ class VideoPreviewWidget extends StatefulWidget {
 }
 
 class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
-  late VideoPlayerController _videoController;
-  bool _isInitialized = false;
+  late final Player _player;
+  late final VideoController _videoController;
 
   @override
   void initState() {
     super.initState();
-
-    final file = File(widget.videoPath);
-    if (!file.existsSync()) {
-      print("File video tidak ditemukan: ${widget.videoPath}");
-      return;
-    }
-
-    _videoController =
-        VideoPlayerController.file(
-            file,
-            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-          )
-          ..initialize()
-              .then((_) {
-                if (mounted) {
-                  setState(() {
-                    _isInitialized = true;
-                  });
-                }
-              })
-              .catchError((e) {
-                print("Gagal init video: $e");
-                if (mounted) setState(() => _isInitialized = false);
-              });
+    _player = Player();
+    _videoController = VideoController(_player);
+    _player.open(Media(widget.videoPath), play: false);
   }
 
   @override
   void dispose() {
-    _videoController.dispose();
+    _player.dispose();
     super.dispose();
+  }
+
+  void _openSemiFullscreen() {
+    _player.pause();
+
+    showDialog(
+      context: context,
+      barrierColor: WarnaApp.wrTextBlack.withValues(alpha: 0.85),
+      barrierDismissible: false,
+      builder: (context) =>
+          SemifullscreenVideoWidget(videoPath: widget.videoPath),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!File(widget.videoPath).existsSync()) {
-      return const Center(
-        child: Icon(Icons.videocam_off, color: WarnaApp.wrGrey, size: 40),
-      );
-    }
-
-    if (!_isInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(color: WarnaApp.wrWhite),
-      );
-    }
-
     return Stack(
       alignment: Alignment.center,
       children: [
-        SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _videoController.value.size.width,
-              height: _videoController.value.size.height,
-              child: VideoPlayer(_videoController),
+        Video(controller: _videoController, fit: BoxFit.cover),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                WarnaApp.wrTextBlack.withValues(alpha: 0.25),
+                Colors.transparent,
+                Colors.transparent,
+                WarnaApp.wrTextBlack.withValues(alpha: 0.25),
+              ],
             ),
           ),
         ),
         IconButton(
-          onPressed: () {
-            setState(() {
-              _videoController.value.isPlaying
-                  ? _videoController.pause()
-                  : _videoController.play();
-            });
-          },
+          onPressed: _openSemiFullscreen,
           icon: Icon(
-            _videoController.value.isPlaying
-                ? Icons.pause_circle_outline_outlined
-                : Icons.play_circle_outline_rounded,
+            Icons.play_circle_outline_rounded,
             size: 62,
-            color: WarnaApp.wrWhite.withValues(alpha: 0.8),
+            color: WarnaApp.wrWhite.withValues(alpha: 0.9),
           ),
         ),
       ],

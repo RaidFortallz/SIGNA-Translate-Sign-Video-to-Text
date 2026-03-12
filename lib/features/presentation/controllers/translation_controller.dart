@@ -1,7 +1,4 @@
 import 'dart:io';
-
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
@@ -94,34 +91,16 @@ class TranslationController extends GetxController {
       print("Source exists: ${await File(path).exists()}");
       print("Target path: $permanentPath");
 
-      final session = await FFmpegKit.execute(
-        '-i "$path" -vcodec libx264 -profile:v baseline -level 3.1 -vf "scale=720:1280,format=yuv420p" -crf 28 -preset ultrafast -acodec aac -movflags +faststart -color_range 1 -colorspace 1 "$permanentPath"',
-      );
-
-      final returnCode = await session.getReturnCode();
-      final output = await session.getOutput();
-      
-      // final logs = await session.getLogs();
-
-      print("FFmpeg return code: $returnCode");
-      print("FFmpeg success: ${ReturnCode.isSuccess(returnCode)}");
-      print("FFmpeg output: $output");
-
-      if (!ReturnCode.isSuccess(returnCode)) {
-        throw Exception("FFmpeg transcode gagal!");
-      }
+      await File(path).copy(permanentPath);
 
       if (await File(permanentPath).exists()) {
         final result = await translateUC.execute(permanentPath);
         currentResult.value = result;
         print("Video path disimpan: $permanentPath");
-        print("File exists: ${await File(permanentPath).exists()}");
+        print("File exists: true");
 
         final File cachedVideo = File(path);
-
-        if (await cachedVideo.exists()) {
-          await cachedVideo.delete();
-        }
+        if (await cachedVideo.exists()) await cachedVideo.delete();
       } else {
         throw Exception("Gagal memindahkan file video");
       }

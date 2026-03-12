@@ -61,7 +61,6 @@ class HistoryPage extends StatelessWidget {
             child: Container(
               // height: 92.w,
               // width: double.infinity.w,
-              
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 border: BoxBorder.all(width: 1.1, color: WarnaApp.wrOrange),
@@ -120,28 +119,64 @@ class HistoryPage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    
+
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.only(left: 20),
                         child: IconButton(
                           onPressed: () {
-                            Get.defaultDialog(
-                              title: "Hapus Riwayat?",
-                              middleText:
-                                  "Video dan hasil terjemahan akan dihapus.",
-                              textConfirm: "Hapus",
-                              textCancel: "Batal",
-                              confirmTextColor: WarnaApp.wrWhite,
-                              buttonColor: WarnaApp.wrRed,
-                              cancelTextColor: WarnaApp.wrTextBlack,
-                              onConfirm: () {
-                                Get.back();
-                                controller.deleteHistoryItem(
-                                  item.id,
-                                  item.videoPath,
-                                );
-                              },
+                            // Get.defaultDialog(
+                            //   barrierDismissible: false,
+                            //   title: "Hapus Riwayat?",
+                            //   middleText:
+                            //       "Video dan hasil terjemahan akan dihapus.",
+                            //   textConfirm: "Hapus",
+                            //   textCancel: "Batal",
+                            //   confirmTextColor: WarnaApp.wrWhite,
+                            //   buttonColor: WarnaApp.wrRed,
+                            //   cancelTextColor: WarnaApp.wrTextBlack,
+                            //   onConfirm: () {
+                            //     Navigator.of(context).pop();
+                            //     controller.deleteHistoryItem(
+                            //       item.id,
+                            //       item.videoPath,
+                            //     );
+                            //   },
+                            // );
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text("Hapus Riwayat?"),
+                                content: const Text(
+                                  "Video dan Hasil Terjemahan akan dihapus.",
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(),
+                                    child: Text(
+                                      "Batal",
+                                      style: TextStyle(
+                                        color: WarnaApp.wrTextBlack,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(dialogContext).pop();
+                                      controller.deleteHistoryItem(
+                                        item.id,
+                                        item.videoPath,
+                                      );
+                                    },
+                                    child: Text(
+                                      "Hapus",
+                                      style: TextStyle(color: WarnaApp.wrRed),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
                           },
                           icon: Icon(
