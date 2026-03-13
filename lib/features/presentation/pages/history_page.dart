@@ -125,24 +125,6 @@ class HistoryPage extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 20),
                         child: IconButton(
                           onPressed: () {
-                            // Get.defaultDialog(
-                            //   barrierDismissible: false,
-                            //   title: "Hapus Riwayat?",
-                            //   middleText:
-                            //       "Video dan hasil terjemahan akan dihapus.",
-                            //   textConfirm: "Hapus",
-                            //   textCancel: "Batal",
-                            //   confirmTextColor: WarnaApp.wrWhite,
-                            //   buttonColor: WarnaApp.wrRed,
-                            //   cancelTextColor: WarnaApp.wrTextBlack,
-                            //   onConfirm: () {
-                            //     Navigator.of(context).pop();
-                            //     controller.deleteHistoryItem(
-                            //       item.id,
-                            //       item.videoPath,
-                            //     );
-                            //   },
-                            // );
                             showDialog(
                               context: context,
                               barrierDismissible: false,

@@ -24,6 +24,7 @@ class TranslationController extends GetxController {
   var isLoading = false.obs;
   var historyList = <TranslationEntity>[].obs;
   var currentResult = Rxn<TranslationEntity>();
+  var videoSource = 'rekam'.obs;
 
   @override
   void onInit() {
@@ -50,6 +51,7 @@ class TranslationController extends GetxController {
           );
           return;
         }
+        videoSource.value = 'upload';
         Get.toNamed(RouteNames.result);
         await processVideoPath(videoPath);
       }
