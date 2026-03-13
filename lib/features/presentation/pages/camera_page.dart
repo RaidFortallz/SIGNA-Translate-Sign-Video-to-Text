@@ -17,24 +17,40 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> {
+class _CameraPageState extends State<CameraPage>
+    with SingleTickerProviderStateMixin {
   final controller = Get.find<TranslationController>();
   bool _isProcessing = false;
 
+  final ValueNotifier<int> _durationNotifer = ValueNotifier(0);
   Timer? _timer;
-  int _recordDuration = 0;
+  // int _recordDuration = 0;
+
+  AnimationController? _blinkController;
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
 
   void _startTimer() {
-    _recordDuration = 0;
+    _durationNotifer.value = 0;
+    _blinkController?.repeat(reverse: true);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        _recordDuration++;
+        _durationNotifer.value++;
       });
     });
   }
 
   void _stopTimer() {
     _timer?.cancel();
+    _blinkController?.stop();
+    _blinkController?.reset();
   }
 
   String _formatDuration(int seconds) {
@@ -46,6 +62,8 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void dispose() {
     _stopTimer();
+    _blinkController?.dispose();
+    _durationNotifer.dispose();
     super.dispose();
   }
 
@@ -53,68 +71,21 @@ class _CameraPageState extends State<CameraPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: WarnaApp.wrTextBlack,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: Padding(
-          padding: EdgeInsets.only(left: 12.h),
-          child: IconButton(
-            onPressed: () => Get.offNamed(RouteNames.main),
-            icon: Icon(
-              Icons.arrow_back_outlined,
-              size: 32.sp,
-              color: WarnaApp.wrWhite,
-            ),
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: EdgeInsets.only(right: 20.h),
-            child: Row(
-              children: [
-                Container(
-                  width: 8.w,
-                  height: 8.w,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: WarnaApp.wrOrangeLight,
-                  ),
-                ),
-                SizedBox(width: 6.h),
-                TextCustom(
-                  "REC",
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: WarnaApp.wrOrangeLight,
-                  letterSpacing: 1.5,
-                ),
-                SizedBox(width: 6.h),
-                TextCustom(
-                  _formatDuration(_recordDuration),
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: WarnaApp.wrOrangeLight,
-                  letterSpacing: 1.5,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+
       // CAMERA PREVIEW
       body: CameraAwesomeBuilder.custom(
         saveConfig: SaveConfig.video(
-          videoOptions: VideoOptions(enableAudio: false, quality: VideoRecordingQuality.hd)
+          videoOptions: VideoOptions(
+            enableAudio: false,
+            quality: VideoRecordingQuality.hd,
+          ),
         ),
         filter: AwesomeFilter.None,
         previewFit: CameraPreviewFit.cover,
-
         sensorConfig: SensorConfig.single(
           sensor: Sensor.position(SensorPosition.back),
           flashMode: FlashMode.none,
           aspectRatio: CameraAspectRatios.ratio_16_9,
-
-          // zoom: 0.0,
         ),
 
         onMediaCaptureEvent: (event) {
@@ -126,6 +97,7 @@ class _CameraPageState extends State<CameraPage> {
                 final videoPath = single.file?.path;
                 if (videoPath != null) {
                   _isProcessing = true;
+                  controller.videoSource.value = 'rekam';
                   controller.processVideoPath(videoPath);
                   Get.offNamed(RouteNames.result);
                 }
@@ -136,28 +108,30 @@ class _CameraPageState extends State<CameraPage> {
         },
 
         builder: (cameraState, previewSize) {
-          bool isRecording = false;
+          final ValueNotifier<bool> isRecordingNotifier = ValueNotifier(false);
+          // bool isRecording = false;
           VoidCallback? onRecordTap;
 
           cameraState.when(
             onPreparingCamera: (state) => null,
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
-              isRecording = false;
+              isRecordingNotifier.value = false;
               videoState.sensorConfig.setBrightness(1.0);
               onRecordTap = () {
                 videoState.startRecording();
                 _startTimer();
+                isRecordingNotifier.value = true;
               };
             },
 
             onVideoRecordingMode: (recordingState) {
-              isRecording = true;
+              isRecordingNotifier.value = true;
               onRecordTap = () {
-                if (_recordDuration < 2) {
+                if (_durationNotifer.value < 2) {
                   Get.snackbar(
                     "Terlalu Singkat",
-                    "Durasi rekaman minimal 2 detika",
+                    "Durasi rekaman minimal 2 detik",
                     backgroundColor: WarnaApp.wrRed,
                     colorText: WarnaApp.wrWhite,
                   );
@@ -165,27 +139,187 @@ class _CameraPageState extends State<CameraPage> {
                 }
                 recordingState.stopRecording();
                 _stopTimer();
+                isRecordingNotifier.value = false;
               };
             },
           );
 
           return Column(
             children: [
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 8.h,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 46.w,
+                          height: 46.h,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            color: WarnaApp.wrTextBlack,
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            onPressed: () => Get.offNamed(RouteNames.main),
+                            icon: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 32.sp,
+                              color: WarnaApp.wrWhite,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.w,
+                          vertical: 6.h,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                          color: WarnaApp.wrTextBlack,
+                        ),
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable: isRecordingNotifier,
+                          builder: (context, isRecording, _) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                FadeTransition(
+                                  opacity:
+                                      (isRecording && _blinkController != null)
+                                      ? _blinkController!
+                                      : const AlwaysStoppedAnimation(0.0),
+                                  child: Container(
+                                    width: 12.w,
+                                    height: 12.w,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: WarnaApp.wrRedAccent,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 10.w),
+                                TextCustom(
+                                  "REC",
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: WarnaApp.wrWhite,
+                                  letterSpacing: 1.7,
+                                ),
+                                SizedBox(width: 10.h),
+                                ValueListenableBuilder<int>(
+                                  valueListenable: _durationNotifer,
+                                  builder: (context, duration, _) {
+                                    return TextCustom(
+                                      _formatDuration(duration),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.normal,
+                                      color: WarnaApp.wrWhite,
+                                      letterSpacing: 1.5,
+                                    );
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+
+                      Row(
+                        children: [
+                          Container(
+                            width: 46.w,
+                            height: 46.h,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(13),
+                              color: WarnaApp.wrTextBlack,
+                            ),
+                            child: cameraState.when(
+                              onPreparingCamera: (_) =>
+                                  const SizedBox(width: 40),
+                              onPhotoMode: (_) => const SizedBox(width: 40),
+                              onVideoMode: (state) => _buildFlashButton(state),
+                              onVideoRecordingMode: (state) =>
+                                  _buildFlashButton(state),
+                            ),
+                          ),
+                          SizedBox(width: 18.w),
+
+                          Container(
+                            width: 46.w,
+                            height: 46.h,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(13),
+                              color: WarnaApp.wrTextBlack,
+                            ),
+                            child: cameraState.when(
+                              onPreparingCamera: (_) =>
+                                  const SizedBox(width: 40),
+                              onPhotoMode: (_) => const SizedBox(width: 40),
+                              onVideoMode: (state) => IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () => state.switchCameraSensor(),
+                                icon: Icon(
+                                  Icons.cameraswitch_rounded,
+                                  color: WarnaApp.wrWhite,
+                                  size: 26,
+                                ),
+                              ),
+                              onVideoRecordingMode: (_) => IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: null,
+                                icon: Icon(
+                                  Icons.cameraswitch_rounded,
+                                  color: WarnaApp.wrGrey,
+                                  size: 26,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               Expanded(
                 child: cameraState.when(
                   onPreparingCamera: (_) => const Center(
                     child: CircularProgressIndicator(color: WarnaApp.wrRed),
                   ),
-                  onVideoMode: (state) => _buildTopOverlay(state, isRecording),
-                  onVideoRecordingMode: (state) =>
-                      _buildTopOverlay(state, isRecording),
+                  onVideoMode: (state) => const SizedBox.shrink(),
+                  onVideoRecordingMode: (state) => const SizedBox.shrink(),
 
                   onPhotoMode: (_) => const SizedBox.shrink(),
                 ),
               ),
-              _buildBottomControls(
-                isRecording: isRecording,
-                onRecordTap: onRecordTap ?? () {},
+              ValueListenableBuilder<bool>(
+                valueListenable: isRecordingNotifier,
+                builder: (context, isRecording, _) {
+                  return _buildBottomControls(
+                    isRecording: isRecording,
+                    onRecordTap: onRecordTap ?? () {},
+                  );
+                },
               ),
             ],
           );
@@ -195,45 +329,24 @@ class _CameraPageState extends State<CameraPage> {
   }
 }
 
-Widget _buildTopOverlay(CameraState state, bool isRecording) {
-  return Stack(
-    children: [
-      Positioned(
-        top: 20,
-        left: 16,
-        child: StreamBuilder<FlashMode>(
-          stream: state.sensorConfig.flashMode$,
-          builder: (context, snapshot) {
-            final isFlashOn = snapshot.data == FlashMode.always;
-            return IconButton(
-              onPressed: () {
-                state.sensorConfig.setFlashMode(
-                  isFlashOn ? FlashMode.none : FlashMode.always,
-                );
-              },
-              icon: Icon(
-                isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                color: isFlashOn ? Colors.yellow : WarnaApp.wrWhite,
-                size: 30,
-              ),
-            );
-          },
+Widget _buildFlashButton(CameraState state) {
+  return StreamBuilder<FlashMode>(
+    stream: state.sensorConfig.flashMode$,
+    builder: (context, snapshot) {
+      final isFlashOn = snapshot.data == FlashMode.always;
+      return IconButton(
+        onPressed: () {
+          state.sensorConfig.setFlashMode(
+            isFlashOn ? FlashMode.none : FlashMode.always,
+          );
+        },
+        icon: Icon(
+          isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+          color: isFlashOn ? Colors.yellow : WarnaApp.wrWhite,
+          size: 26,
         ),
-      ),
-
-      Positioned(
-        top: 20,
-        right: 16,
-        child: IconButton(
-          onPressed: isRecording ? null : () => state.switchCameraSensor(),
-          icon: Icon(
-            Icons.cameraswitch_rounded,
-            color: isRecording ? WarnaApp.wrGrey : WarnaApp.wrWhite,
-            size: 30,
-          ),
-        ),
-      ),
-    ],
+      );
+    },
   );
 }
 
