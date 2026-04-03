@@ -5,6 +5,7 @@ import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
+import 'package:signa_video_to_text/features/presentation/widgets/video_thumbanil_widget.dart';
 
 class HistoryPage extends StatelessWidget {
   final controller = Get.find<TranslationController>();
@@ -71,18 +72,10 @@ class HistoryPage extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      height: 66.w,
+                    VideoThumbanilWidget(
+                      videoPath: item.videoPath,
                       width: 66.w,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: WarnaApp.wrGrey,
-                      ),
-                      child: Icon(
-                        Icons.play_circle_outline,
-                        size: 46.sp,
-                        color: WarnaApp.wrWhite,
-                      ),
+                      height: 66.w,
                     ),
                     SizedBox(width: 14.w),
                     Expanded(

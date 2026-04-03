@@ -2,10 +2,56 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
+
+Future<List<List<List<List<double>>>>> _processFramesInBackground(
+  Map<String, dynamic> params,
+) async {
+  int targetFrames = params['targetFrames'];
+  int imgWidth = params['imgWidth'];
+  int imgHeight = params['imgHeight'];
+  String frameDirPath = params['frameDirPath'];
+
+  List<List<List<List<double>>>> videoFrames = [];
+
+  for (int i = 1; i <= targetFrames; i++) {
+    String fileName = 'frame_${i.toString().padLeft(3, '0')}.jpg';
+    File imgFile = File('$frameDirPath/$fileName');
+
+    List<List<List<double>>> frameData = [];
+
+    if (imgFile.existsSync()) {
+      img.Image? image = img.decodeImage(imgFile.readAsBytesSync());
+
+      for (int y = 0; y < imgHeight; y++) {
+        List<List<double>> row = [];
+        for (int x = 0; x < imgWidth; x++) {
+          if (image != null) {
+            img.Pixel pixel = image.getPixel(x, y);
+            row.add([pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0]);
+          } else {
+            row.add([0.0, 0.0, 0.0]);
+          }
+        }
+        frameData.add(row);
+      }
+    } else {
+      for (int y = 0; y < imgHeight; y++) {
+        List<List<double>> row = [];
+        for (int x = 0; x < imgWidth; x++) {
+          row.add([0.0, 0.0, 0.0]);
+        }
+        frameData.add(row);
+      }
+    }
+    videoFrames.add(frameData);
+  }
+  return videoFrames;
+}
 
 class TfliteDataSources {
   Interpreter? interpreter;
@@ -23,11 +69,13 @@ class TfliteDataSources {
   Future<void> loadModel() async {
     try {
       interpreter = await Interpreter.fromAsset(
-        'assets/model/3dcnn_model.tflite',
+        'assets/model/newDataset3dcnn_model.tflite',
       );
       print("Model 3D CNN berhasil di load");
 
-      final String jsonString = await rootBundle.loadString('assets/model/classes.json');
+      final String jsonString = await rootBundle.loadString(
+        'assets/model/classes.json',
+      );
       final List<dynamic> jsonResponse = json.decode(jsonString);
       labels = jsonResponse.cast<String>();
       print("Labels JSON berhasil di-load. Jumlah kata: ${labels.length}");
@@ -38,7 +86,9 @@ class TfliteDataSources {
 
   Future<Map<String, dynamic>> runInference(String path) async {
     if (interpreter == null || labels.isEmpty) {
-      print("Interpreter model atau label belum siap, nunggu loadModel() bentar...");
+      print(
+        "Interpreter model atau label belum siap, nunggu loadModel() bentar...",
+      );
       await loadModel();
     }
 
@@ -73,8 +123,11 @@ class TfliteDataSources {
       }
 
       double finalConfidence = maxConfidence * 100;
-      if (finalConfidence < 80.0) {
-        return {'label': 'Gerakan Tidak Diketahui', 'confidence': finalConfidence};
+      if (finalConfidence < 70.0) {
+        return {
+          'label': 'Gerakan Tidak Diketahui',
+          'confidence': finalConfidence,
+        };
       }
 
       return {'label': labels[maxIndex], 'confidence': finalConfidence};
@@ -96,38 +149,16 @@ class TfliteDataSources {
         '-i "$videoPath" -vf "fps=$targetFrames/1,scale=$imgWidth:$imgHeight" -vframes $targetFrames "${frameDir.path}/frame_%03d.jpg"';
     await FFmpegKit.execute(command);
 
-    List<List<List<List<double>>>> videoFrames = [];
+    print("Mulai bongkar pixel gambar di Background Thread...");
+    List<List<List<List<double>>>> resultFrames =
+        await compute(_processFramesInBackground, {
+          'targetFrames': targetFrames,
+          'imgWidth': imgWidth,
+          'imgHeight': imgHeight,
+          'frameDirPath': frameDir.path,
+        });
 
-    for (int i = 1; i <= targetFrames; i++) {
-      String fileName = 'frame_${i.toString().padLeft(3, '0')}.jpg';
-      File imgFile = File('${frameDir.path}/$fileName');
-
-      List<List<List<double>>> frameData = [];
-
-      if (imgFile.existsSync()) {
-        img.Image? image = img.decodeImage(imgFile.readAsBytesSync());
-
-        for (int y = 0; y < imgHeight; y++) {
-          List<List<double>> row = [];
-          for (int x = 0; x < imgWidth; x++) {
-            img.Pixel pixel = image!.getPixel(x, y);
-
-            row.add([pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0]);
-          }
-          frameData.add(row);
-        }
-      } else {
-        for (int y = 0; y < imgHeight; y++) {
-          List<List<double>> row = [];
-          for (int x = 0; x < imgWidth; x++) {
-            row.add([0.0, 0.0, 0.0]);
-          }
-          frameData.add(row);
-        }
-      }
-      videoFrames.add(frameData);
-    }
-    return [videoFrames];
+    return [resultFrames];
   }
 
   void close() {
