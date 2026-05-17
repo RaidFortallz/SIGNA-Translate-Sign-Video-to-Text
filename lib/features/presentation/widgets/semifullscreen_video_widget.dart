@@ -23,12 +23,20 @@ class _SemifullscreenVideoWidgetState extends State<SemifullscreenVideoWidget> {
     super.initState();
     _player = Player();
     _controller = VideoController(_player);
-    _player.open(Media(widget.videoPath), play: true);
+    _player.open(Media('file://${widget.videoPath}'), play: true);
 
-    _player.stream.videoParams.listen((params) {
-      if (params.w != null && params.h != null && mounted) {
-        setState(() {
-          _isPortrait = params.h! >= params.w!;
+    _player.stream.completed.listen((done) {
+      if (done) _player.seek(Duration.zero);
+    });
+
+    _player.stream.width.listen((w) {
+      if (mounted && w != null) {
+        _player.stream.height.first.then((h) {
+          if (h != null && mounted) {
+            setState(() {
+              _isPortrait = h >= w;
+            });
+          }
         });
       }
     });
@@ -161,7 +169,8 @@ class _SemifullscreenVideoWidgetState extends State<SemifullscreenVideoWidget> {
                             final position = posSnapshot.data ?? Duration.zero;
                             final progress = duration.inMilliseconds > 0
                                 ? (position.inMilliseconds /
-                                      duration.inMilliseconds).clamp(0.0, 1.0)
+                                          duration.inMilliseconds)
+                                      .clamp(0.0, 1.0)
                                 : 0.0;
 
                             return Container(
@@ -189,7 +198,8 @@ class _SemifullscreenVideoWidgetState extends State<SemifullscreenVideoWidget> {
                                       ),
                                       trackHeight: 2.5,
                                       activeTrackColor: WarnaApp.wrWhite,
-                                      inactiveTrackColor: WarnaApp.wrWhite.withValues(alpha: 0.3),
+                                      inactiveTrackColor: WarnaApp.wrWhite
+                                          .withValues(alpha: 0.3),
                                       thumbColor: WarnaApp.wrWhite,
                                       overlayColor: WarnaApp.wrWhite.withValues(
                                         alpha: 0.2,
@@ -197,11 +207,19 @@ class _SemifullscreenVideoWidgetState extends State<SemifullscreenVideoWidget> {
                                     ),
                                     child: Slider(
                                       value: progress,
-                                      onChanged: duration.inMilliseconds > 0 ? (val) {
-                                        _player.seek(Duration(
-                                          milliseconds: (val * duration.inMilliseconds).toInt()
-                                        ));
-                                      } : null,
+                                      onChanged: duration.inMilliseconds > 0
+                                          ? (val) {
+                                              _player.seek(
+                                                Duration(
+                                                  milliseconds:
+                                                      (val *
+                                                              duration
+                                                                  .inMilliseconds)
+                                                          .toInt(),
+                                                ),
+                                              );
+                                            }
+                                          : null,
                                     ),
                                   ),
 

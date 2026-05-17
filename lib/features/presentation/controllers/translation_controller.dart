@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
@@ -77,7 +79,11 @@ class TranslationController extends GetxController {
     }
   }
 
-  Future<void> processVideoPath(String path) async {
+  Future<void> processVideoPath(
+    String path, {
+    Duration? trimStart,
+    Duration? trimEnd,
+  }) async {
     try {
       isLoading.value = true;
       currentResult.value = null;
@@ -89,11 +95,25 @@ class TranslationController extends GetxController {
       final String safeFileName = 'signa_vid_$timestamp.mp4';
       final String permanentPath = p.join(directory.path, safeFileName);
 
+      final bool hasTrim = trimStart != null && trimEnd != null;
+
+      if (hasTrim) {
+        final session = await FFmpegKit.execute(
+          '-ss ${_toFFmpegTime(trimStart)} '
+          '-to ${_toFFmpegTime(trimEnd)} '
+          '-i "$path" -c copy -y "$permanentPath"',
+        );
+        final rc = await session.getReturnCode();
+        if (!ReturnCode.isSuccess(rc)) {
+          await File(path).copy(permanentPath);
+        }
+      } else {
+        await File(path).copy(permanentPath);
+      }
+
       print("Source path: $path");
       print("Source exists: ${await File(path).exists()}");
       print("Target path: $permanentPath");
-
-      await File(path).copy(permanentPath);
 
       if (await File(permanentPath).exists()) {
         final result = await translateUC.execute(permanentPath);
@@ -125,11 +145,23 @@ class TranslationController extends GetxController {
       }
       await deleteUC.execute(id, path);
       await loadHistory();
-      Get.snackbar('Sukses', 'Riwayat berhasil dihapus');
+      Get.snackbar(
+        'Sukses',
+        'Riwayat berhasil dihapus',
+        duration: const Duration(milliseconds: 850),
+      );
     } catch (e) {
       Get.snackbar('Error Hapus', e.toString());
     } finally {
       isLoading.value = false;
     }
+  }
+
+  String _toFFmpegTime(Duration d) {
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final ms = d.inMilliseconds.remainder(1000).toString().padLeft(3, '0');
+    return '$h:$m:$s.$ms';
   }
 }

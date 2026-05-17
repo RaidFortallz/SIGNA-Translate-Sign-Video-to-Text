@@ -23,7 +23,7 @@ class HomePage extends StatelessWidget {
               children: [
                 TextCustom(
                   "Selamat Datang Di",
-                  fontSize: 24,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: WarnaApp.wrTextBlack,
                 ),
@@ -46,9 +46,9 @@ class HomePage extends StatelessWidget {
                 ),
                 SizedBox(height: 14.h),
                 TextCustom(
-                  "Mulai rekam video bahasa isyarat \n   untuk melihat terjemahannya",
+                  "Terjemahkan gerakan bahasa isyarat BISINDO \n   menjadi teks secara otomatis",
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.normal,
                   color: WarnaApp.wrTextBlack,
                 ),
                 SizedBox(height: 44.h),
@@ -81,28 +81,106 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 26.h),
-                TextCustom("Ketuk untuk mulai rekam", fontSize: 13),
-                SizedBox(
-                  height: 36.w,
-                  width: 192.w,
-                  child: Divider(
-                    thickness: 3,
-                    color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                GestureDetector(
+                  onTap: () => controller.recordVideo(),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 6.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: WarnaApp.wrOrange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: WarnaApp.wrOrange.withValues(alpha: 0.2),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: TextCustom(
+                      "Ketuk untuk mulai rekam",
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: WarnaApp.wrOrangeDeep,
+                    ),
                   ),
                 ),
 
+                SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: WarnaApp.wrOrange.withValues(alpha: 0.6),
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w),
+                      child: TextCustom(
+                        "atau",
+                        fontSize: 12,
+                        color: WarnaApp.wrGrey.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: WarnaApp.wrOrange.withValues(alpha: 0.6),
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+
                 IconButton(
                   onPressed: controller.uploadVideo,
-                  icon: Icon(
-                    Icons.drive_folder_upload,
-                    size: 53.sp,
-                    color: WarnaApp.wrOrange,
+                  icon: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (Rect bounds) {
+                      return const LinearGradient(
+                        colors: [WarnaApp.wrOrange, WarnaApp.wrBlue],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(bounds);
+                    },
+                    child: Icon(
+                      Icons.drive_folder_upload,
+                      size: 53.sp,
+                      color: WarnaApp.wrOrange,
+                    ),
                   ),
                 ),
-                TextCustom(
-                  "Upload Video",
-                  fontSize: 13,
-                  fontWeight: FontWeight.normal,
+                GestureDetector(
+                  onTap: () => controller.uploadVideo(),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    decoration: BoxDecoration(
+                      color: WarnaApp.wrWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: WarnaApp.wrBlue.withValues(alpha: 0.4),
+                        width: 0.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: WarnaApp.wrOrange.withValues(alpha: 0.14),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: TextCustom(
+                        "Upload Video",
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: WarnaApp.wrBlue,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -136,7 +214,7 @@ class HomePage extends StatelessWidget {
                     blurRadius: 20,
                     spreadRadius: 4,
                     offset: const Offset(0, 8),
-                  )
+                  ),
                 ],
                 duration: const Duration(seconds: 3),
                 animationDuration: const Duration(milliseconds: 500),

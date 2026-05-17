@@ -22,7 +22,7 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
     super.initState();
     _player = Player();
     _videoController = VideoController(_player);
-    _player.open(Media(widget.videoPath), play: false);
+    _player.open(Media('file://${widget.videoPath}'), play: false);
   }
 
   @override

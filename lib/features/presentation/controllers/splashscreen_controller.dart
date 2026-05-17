@@ -23,7 +23,7 @@ class SplashscreenController extends GetxController {
     });
 
     // pindah halaman setelah circle muncul
-    Future.delayed(totalDuration + const Duration(milliseconds: 1300), () {
+    Future.delayed(totalDuration + const Duration(milliseconds: 3200), () {
       Get.offAllNamed(RouteNames.main);
     });
   }

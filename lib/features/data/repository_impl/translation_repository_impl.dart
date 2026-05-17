@@ -18,8 +18,15 @@ class TranslationRepositoryImpl implements ITranslationRepository {
   });
 
   @override
-  Future<TranslationEntity> processVideo(String path) async {
-    final aiResult = await aiSource.runInference(path);
+  Future<TranslationEntity> processVideo(
+    String path, {
+    Duration? trimStart,
+    Duration? trimEnd,
+  }) async {
+    final aiResult = await aiSource.runInference(
+      path,
+      
+    );
 
     final newTranslation = TranslationModel(
       id: const Uuid().v4(),

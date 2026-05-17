@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:camerawesome/camerawesome_plugin.dart';
-import 'package:camerawesome/pigeon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -17,40 +16,38 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage>
-    with SingleTickerProviderStateMixin {
+class _CameraPageState extends State<CameraPage> {
   final controller = Get.find<TranslationController>();
   bool _isProcessing = false;
 
   final ValueNotifier<int> _durationNotifer = ValueNotifier(0);
+  final ValueNotifier<bool> _blinkNotifier = ValueNotifier(true);
   Timer? _timer;
-  // int _recordDuration = 0;
-
-  AnimationController? _blinkController;
+  int _ticks = 0; //buat hitung putaran timer
 
   @override
   void initState() {
     super.initState();
-    _blinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
   }
 
   void _startTimer() {
     _durationNotifer.value = 0;
-    _blinkController?.repeat(reverse: true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
+    _blinkNotifier.value = true;
+    _ticks = 0;
+
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      _blinkNotifier.value = !_blinkNotifier.value;
+      _ticks++;
+
+      if (_ticks % 2 == 0) {
         _durationNotifer.value++;
-      });
+      }
     });
   }
 
   void _stopTimer() {
     _timer?.cancel();
-    _blinkController?.stop();
-    _blinkController?.reset();
+    _blinkNotifier.value = false;
   }
 
   String _formatDuration(int seconds) {
@@ -62,8 +59,8 @@ class _CameraPageState extends State<CameraPage>
   @override
   void dispose() {
     _stopTimer();
-    _blinkController?.dispose();
     _durationNotifer.dispose();
+    _blinkNotifier.dispose();
     super.dispose();
   }
 
@@ -74,12 +71,7 @@ class _CameraPageState extends State<CameraPage>
 
       // CAMERA PREVIEW
       body: CameraAwesomeBuilder.custom(
-        saveConfig: SaveConfig.video(
-          videoOptions: VideoOptions(
-            enableAudio: false,
-            quality: VideoRecordingQuality.hd,
-          ),
-        ),
+        saveConfig: SaveConfig.video(),
         filter: AwesomeFilter.None,
         previewFit: CameraPreviewFit.cover,
         sensorConfig: SensorConfig.single(
@@ -98,8 +90,9 @@ class _CameraPageState extends State<CameraPage>
                 if (videoPath != null) {
                   _isProcessing = true;
                   controller.videoSource.value = 'rekam';
-                  controller.processVideoPath(videoPath);
-                  Get.offNamed(RouteNames.result);
+                  // controller.processVideoPath(videoPath);
+                  // Get.offNamed(RouteNames.result);
+                  Get.offNamed(RouteNames.trim, arguments: videoPath);
                 }
               },
               multiple: (multiple) => null,
@@ -108,25 +101,23 @@ class _CameraPageState extends State<CameraPage>
         },
 
         builder: (cameraState, previewSize) {
-          final ValueNotifier<bool> isRecordingNotifier = ValueNotifier(false);
-          // bool isRecording = false;
+          bool isRecording = false;
           VoidCallback? onRecordTap;
 
           cameraState.when(
             onPreparingCamera: (state) => null,
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
-              isRecordingNotifier.value = false;
-              videoState.sensorConfig.setBrightness(1.0);
+              isRecording = false;
+              // videoState.sensorConfig.setBrightness(0.3);
               onRecordTap = () {
                 videoState.startRecording();
                 _startTimer();
-                isRecordingNotifier.value = true;
               };
             },
 
             onVideoRecordingMode: (recordingState) {
-              isRecordingNotifier.value = true;
+              isRecording = true;
               onRecordTap = () {
                 if (_durationNotifer.value < 2) {
                   Get.snackbar(
@@ -139,7 +130,6 @@ class _CameraPageState extends State<CameraPage>
                 }
                 recordingState.stopRecording();
                 _stopTimer();
-                isRecordingNotifier.value = false;
               };
             },
           );
@@ -156,59 +146,68 @@ class _CameraPageState extends State<CameraPage>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 46.w,
-                          height: 46.h,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                      if (!isRecording)
+                        AwesomeOrientedWidget(
+                          child: Center(
+                            child: Container(
+                              width: 46.w,
+                              height: 46.h,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                color: WarnaApp.wrTextBlack,
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () => Get.offNamed(RouteNames.main),
+                                icon: Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 32.sp,
+                                  color: WarnaApp.wrWhite,
+                                ),
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(16),
-                            color: WarnaApp.wrTextBlack,
                           ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () => Get.offNamed(RouteNames.main),
-                            icon: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 32.sp,
-                              color: WarnaApp.wrWhite,
+                        )
+                      else
+                        SizedBox(width: 46.w),
+
+                      if (isRecording)
+                        AwesomeOrientedWidget(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 6.h,
                             ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10.w,
-                          vertical: 6.h,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: WarnaApp.wrGrey.withValues(alpha: 0.3),
-                          ),
-                          borderRadius: BorderRadius.circular(13),
-                          color: WarnaApp.wrTextBlack,
-                        ),
-                        child: ValueListenableBuilder<bool>(
-                          valueListenable: isRecordingNotifier,
-                          builder: (context, isRecording, _) {
-                            return Row(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(13),
+                              color: WarnaApp.wrTextBlack,
+                            ),
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                FadeTransition(
-                                  opacity:
-                                      (isRecording && _blinkController != null)
-                                      ? _blinkController!
-                                      : const AlwaysStoppedAnimation(0.0),
-                                  child: Container(
-                                    width: 12.w,
-                                    height: 12.w,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: WarnaApp.wrRedAccent,
-                                    ),
-                                  ),
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: _blinkNotifier,
+                                  builder: (context, isBlinking, _) {
+                                    return Opacity(
+                                      opacity: (isRecording && isBlinking)
+                                          ? 1.0
+                                          : 0.0,
+                                      child: Container(
+                                        width: 12.w,
+                                        height: 12.w,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: WarnaApp.wrRedAccent,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                                 SizedBox(width: 10.w),
                                 TextCustom(
@@ -232,64 +231,70 @@ class _CameraPageState extends State<CameraPage>
                                   },
                                 ),
                               ],
-                            );
-                          },
-                        ),
-                      ),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(),
 
                       Row(
                         children: [
-                          Container(
-                            width: 46.w,
-                            height: 46.h,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                          AwesomeOrientedWidget(
+                            child: Container(
+                              width: 46.w,
+                              height: 46.h,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: WarnaApp.wrGrey.withValues(alpha: 0.3),
+                                ),
+                                borderRadius: BorderRadius.circular(13),
+                                color: WarnaApp.wrTextBlack,
                               ),
-                              borderRadius: BorderRadius.circular(13),
-                              color: WarnaApp.wrTextBlack,
-                            ),
-                            child: cameraState.when(
-                              onPreparingCamera: (_) =>
-                                  const SizedBox(width: 40),
-                              onPhotoMode: (_) => const SizedBox(width: 40),
-                              onVideoMode: (state) => _buildFlashButton(state),
-                              onVideoRecordingMode: (state) =>
-                                  _buildFlashButton(state),
+                              child: cameraState.when(
+                                onPreparingCamera: (_) =>
+                                    const SizedBox(width: 40),
+                                onPhotoMode: (_) => const SizedBox(width: 40),
+                                onVideoMode: (state) =>
+                                    _buildFlashButton(state),
+                                onVideoRecordingMode: (state) =>
+                                    _buildFlashButton(state),
+                              ),
                             ),
                           ),
                           SizedBox(width: 18.w),
 
-                          Container(
-                            width: 46.w,
-                            height: 46.h,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: WarnaApp.wrGrey.withValues(alpha: 0.3),
-                              ),
-                              borderRadius: BorderRadius.circular(13),
-                              color: WarnaApp.wrTextBlack,
-                            ),
-                            child: cameraState.when(
-                              onPreparingCamera: (_) =>
-                                  const SizedBox(width: 40),
-                              onPhotoMode: (_) => const SizedBox(width: 40),
-                              onVideoMode: (state) => IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: () => state.switchCameraSensor(),
-                                icon: Icon(
-                                  Icons.cameraswitch_rounded,
-                                  color: WarnaApp.wrWhite,
-                                  size: 26,
+                          AwesomeOrientedWidget(
+                            child: Container(
+                              width: 46.w,
+                              height: 46.h,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: WarnaApp.wrGrey.withValues(alpha: 0.3),
                                 ),
+                                borderRadius: BorderRadius.circular(13),
+                                color: WarnaApp.wrTextBlack,
                               ),
-                              onVideoRecordingMode: (_) => IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: null,
-                                icon: Icon(
-                                  Icons.cameraswitch_rounded,
-                                  color: WarnaApp.wrGrey,
-                                  size: 26,
+                              child: cameraState.when(
+                                onPreparingCamera: (_) =>
+                                    const SizedBox(width: 40),
+                                onPhotoMode: (_) => const SizedBox(width: 40),
+                                onVideoMode: (state) => IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => state.switchCameraSensor(),
+                                  icon: Icon(
+                                    Icons.cameraswitch_rounded,
+                                    color: WarnaApp.wrWhite,
+                                    size: 26,
+                                  ),
+                                ),
+                                onVideoRecordingMode: (_) => IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: null,
+                                  icon: Icon(
+                                    Icons.cameraswitch_rounded,
+                                    color: WarnaApp.wrGrey,
+                                    size: 26,
+                                  ),
                                 ),
                               ),
                             ),
@@ -301,30 +306,92 @@ class _CameraPageState extends State<CameraPage>
                 ),
               ),
 
+              //AREA GESTURE FOCUS & FRAMING GUIDE
               Expanded(
-                child: cameraState.when(
-                  onPreparingCamera: (_) => const Center(
-                    child: CircularProgressIndicator(color: WarnaApp.wrRed),
-                  ),
-                  onVideoMode: (state) => const SizedBox.shrink(),
-                  onVideoRecordingMode: (state) => const SizedBox.shrink(),
+                child: ClipRRect(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: cameraState.when(
+                          onPreparingCamera: (_) => const Center(
+                            child: CircularProgressIndicator(
+                              color: WarnaApp.wrRed,
+                            ),
+                          ),
+                          onVideoMode: (state) => AwesomeCameraGestureDetector(
+                            onPreviewScale: OnPreviewScale(
+                              onScale: (scale) {
+                                state.sensorConfig.setZoom(scale);
+                              },
+                            ),
+                            child: Container(color: Colors.transparent),
+                          ),
+                          onVideoRecordingMode: (state) =>
+                              AwesomeCameraGestureDetector(
+                                onPreviewScale: OnPreviewScale(
+                                  onScale: (scale) {
+                                    state.sensorConfig.setZoom(scale);
+                                  },
+                                ),
+                                child: Container(color: Colors.transparent),
+                              ),
 
-                  onPhotoMode: (_) => const SizedBox.shrink(),
+                          onPhotoMode: (_) => const SizedBox.shrink(),
+                        ),
+                      ),
+
+                      if (!isRecording)
+                        Center(
+                          child: IgnorePointer(
+                            child: Container(
+                              width: MediaQuery.of(context).size.width * 0.65,
+                              height: MediaQuery.of(context).size.height * 0.45,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: WarnaApp.wrWhite.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              alignment: Alignment.bottomCenter,
+                              padding: EdgeInsets.only(bottom: 12.h),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 14.w,
+                                  vertical: 6.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: WarnaApp.wrTextBlack.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: TextCustom(
+                                  "Posisikan badan & tangan di area ini",
+                                  fontSize: 12,
+                                  color: WarnaApp.wrWhite.withValues(
+                                    alpha: 0.9,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              ValueListenableBuilder<bool>(
-                valueListenable: isRecordingNotifier,
-                builder: (context, isRecording, _) {
-                  return _buildBottomControls(
-                    isRecording: isRecording,
-                    onRecordTap: onRecordTap ?? () {},
-                  );
-                },
+              _buildBottomControls(
+                isRecording: isRecording,
+                onRecordTap: onRecordTap ?? () {},
               ),
             ],
           );
         },
       ),
+      
     );
   }
 }
@@ -355,6 +422,7 @@ Widget _buildBottomControls({
   required VoidCallback onRecordTap,
 }) {
   return Container(
+    height: 160.h,
     width: double.infinity,
     padding: EdgeInsets.symmetric(vertical: 38.h),
     decoration: const BoxDecoration(
@@ -398,10 +466,13 @@ Widget _buildBottomControls({
         ),
 
         SizedBox(height: 14.h),
-        TextCustom(
-          isRecording ? "Sedang merekam..." : "Ketuk untuk mulai rekam",
-          fontSize: 14,
-          color: WarnaApp.wrTextBlack,
+        SizedBox(
+          height: 20.h,
+          child: TextCustom(
+            isRecording ? "Sedang merekam..." : "Ketuk untuk mulai rekam",
+            fontSize: 14,
+            color: WarnaApp.wrTextBlack,
+          ),
         ),
       ],
     ),

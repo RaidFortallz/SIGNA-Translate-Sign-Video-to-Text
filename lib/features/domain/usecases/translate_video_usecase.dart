@@ -6,7 +6,15 @@ class TranslateVideoUsecase {
 
   TranslateVideoUsecase({required this.repo});
 
-  Future<TranslationEntity> execute(String videoPath) async {
-    return await repo.processVideo(videoPath);
+  Future<TranslationEntity> execute(
+    String videoPath, {
+    Duration? trimStart,
+    Duration? trimEnd,
+  }) async {
+    return await repo.processVideo(
+      videoPath,
+      trimStart: trimStart,
+      trimEnd: trimEnd,
+    );
   }
 }
