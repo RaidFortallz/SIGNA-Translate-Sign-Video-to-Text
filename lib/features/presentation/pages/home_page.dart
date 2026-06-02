@@ -46,10 +46,11 @@ class HomePage extends StatelessWidget {
                 ),
                 SizedBox(height: 14.h),
                 TextCustom(
-                  "Terjemahkan gerakan bahasa isyarat BISINDO \n   menjadi teks secara otomatis",
+                  "Terjemahkan gerakan bahasa isyarat BISINDO menjadi teks secara otomatis",
                   fontSize: 14,
                   fontWeight: FontWeight.normal,
                   color: WarnaApp.wrTextBlack,
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 44.h),
 

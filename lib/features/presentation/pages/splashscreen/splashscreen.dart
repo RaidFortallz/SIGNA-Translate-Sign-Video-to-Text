@@ -191,7 +191,7 @@ class Splashscreen extends StatelessWidget {
                               ),
                               child: Center(
                                 child: Text(
-                                  "Copyright",
+                                  "C",
                                   style: TextStyle(
                                     fontSize: 7.5,
                                     color: Colors.white.withValues(alpha: 0.5),
@@ -202,7 +202,7 @@ class Splashscreen extends StatelessWidget {
                             ),
                             SizedBox(width: 6),
                             Text(
-                              "by Aridwan & MDimasDP",
+                              "Copyright by Aridwan & MDimasDP",
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.white.withValues(alpha: 0.4),

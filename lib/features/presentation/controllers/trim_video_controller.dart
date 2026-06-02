@@ -59,7 +59,14 @@ class TrimVideoController extends GetxController {
     if (isPlaying.value) {
       player.pause();
     } else {
-      _seekToStart();
+      final int posMs = position.value.inMilliseconds;
+      final int totalMs = duration.value.inMilliseconds;
+      final int startMs = (trimRange.value.start * totalMs).round();
+      final int endMs = (trimRange.value.end * totalMs).round();
+
+      if (posMs < startMs || posMs >= endMs) {
+        _seekToStart();
+      }
       player.play();
     }
   }

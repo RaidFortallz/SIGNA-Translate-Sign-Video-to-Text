@@ -19,6 +19,7 @@ class CameraPage extends StatefulWidget {
 class _CameraPageState extends State<CameraPage> {
   final controller = Get.find<TranslationController>();
   bool _isProcessing = false;
+  SensorPosition _currentSensor = SensorPosition.back;
 
   final ValueNotifier<int> _durationNotifer = ValueNotifier(0);
   final ValueNotifier<bool> _blinkNotifier = ValueNotifier(true);
@@ -67,15 +68,17 @@ class _CameraPageState extends State<CameraPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: ValueKey(_currentSensor),
       backgroundColor: WarnaApp.wrTextBlack,
-
       // CAMERA PREVIEW
       body: CameraAwesomeBuilder.custom(
+        
+        mirrorFrontCamera: true,
         saveConfig: SaveConfig.video(),
         filter: AwesomeFilter.None,
-        previewFit: CameraPreviewFit.cover,
+        previewFit: CameraPreviewFit.contain,
         sensorConfig: SensorConfig.single(
-          sensor: Sensor.position(SensorPosition.back),
+          sensor: Sensor.position(_currentSensor),
           flashMode: FlashMode.none,
           aspectRatio: CameraAspectRatios.ratio_16_9,
         ),
@@ -90,8 +93,9 @@ class _CameraPageState extends State<CameraPage> {
                 if (videoPath != null) {
                   _isProcessing = true;
                   controller.videoSource.value = 'rekam';
-                  // controller.processVideoPath(videoPath);
-                  // Get.offNamed(RouteNames.result);
+                  controller.isFrontCamera.value =
+                      _currentSensor == SensorPosition.front;
+
                   Get.offNamed(RouteNames.trim, arguments: videoPath);
                 }
               },
@@ -280,7 +284,15 @@ class _CameraPageState extends State<CameraPage> {
                                 onPhotoMode: (_) => const SizedBox(width: 40),
                                 onVideoMode: (state) => IconButton(
                                   padding: EdgeInsets.zero,
-                                  onPressed: () => state.switchCameraSensor(),
+                                  onPressed: () {
+                                    // state.switchCameraSensor();
+                                    setState(() {
+                                      _currentSensor =
+                                          _currentSensor == SensorPosition.back
+                                          ? SensorPosition.front
+                                          : SensorPosition.back;
+                                    });
+                                  },
                                   icon: Icon(
                                     Icons.cameraswitch_rounded,
                                     color: WarnaApp.wrWhite,
@@ -391,7 +403,6 @@ class _CameraPageState extends State<CameraPage> {
           );
         },
       ),
-      
     );
   }
 }

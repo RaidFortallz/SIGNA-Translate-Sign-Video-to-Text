@@ -150,7 +150,10 @@ class TrimEditVideoPage extends StatelessWidget {
               final selectedSec = (endDur - startDur).inMilliseconds / 1000.0;
               final posRatio = totalMs == 0
                   ? 0.0
-                  : controller.position.value.inMilliseconds / totalMs;
+                  : (controller.position.value.inMilliseconds /
+                        totalMs).clamp(0.0, 1.0);
+              final startRatio = controller.trimRange.value.start;
+              final endRatio = controller.trimRange.value.end;
 
               return Container(
                 margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -185,35 +188,54 @@ class TrimEditVideoPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: 12.h),
+                    SizedBox(height: 14.h),
 
                     // Progres saat ini
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: SizedBox(
-                        height: 3.h,
-                        width: double.infinity,
-                        child: Stack(
+                    //Progress bar dengan trim zone highlight
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double w = constraints.maxWidth;
+                        return Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              color: WarnaApp.wrWhite.withValues(alpha: 0.1),
-                            ),
-                            FractionallySizedBox(
-                              widthFactor: posRatio.clamp(0.0, 1.0),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
                               child: Container(
+                                height: 5.h,
+                                color: WarnaApp.wrWhite.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            // Zona trim (highlight antara start–end)
+                            Positioned(
+                              left: startRatio * w,
+                              width: (endRatio - startRatio) * w,
+                              top: 0,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  height: 5.h,
+                                  color: WarnaApp.wrRed.withValues(alpha: 0.35),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: (posRatio * w - 1).clamp(0, w - 2),
+                              top: -2.h,
+                              child: Container(
+                                width: 2.5,
+                                height: 9.h,
                                 decoration: BoxDecoration(
-                                  color: WarnaApp.wrWhite.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: WarnaApp.wrWhite,
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
                             ),
                           ],
-                        ),
-                      ),
+                        );
+                      },
                     ),
-                    SizedBox(height: 12.h),
+
+                    SizedBox(height: 16.h),
 
                     // Range Slider
                     SliderTheme(
@@ -225,17 +247,33 @@ class TrimEditVideoPage extends StatelessWidget {
                         thumbColor: WarnaApp.wrWhite,
                         overlayColor: WarnaApp.wrRed.withValues(alpha: 0.15),
                         rangeThumbShape: const RoundRangeSliderThumbShape(
-                          enabledThumbRadius: 9,
+                          enabledThumbRadius: 10,
+                          disabledThumbRadius: 8,
                         ),
-                        trackHeight: 3.5.h,
+                        rangeTrackShape:
+                            const RoundedRectRangeSliderTrackShape(),
+                        trackHeight: 4.h,
+                        minThumbSeparation: 20,
                       ),
                       child: RangeSlider(
                         values: controller.trimRange.value,
                         min: 0.0,
                         max: 1.0,
                         onChanged: controller.updateTrimRange,
+                        onChangeStart: (values) {
+                          controller.player.pause();
+                        },
+                        onChangeEnd: (values) {
+                          final int ms =
+                              (values.start *
+                                      controller.duration.value.inMilliseconds)
+                                  .round();
+                          controller.player.seek(Duration(milliseconds: ms));
+                        },
                       ),
                     ),
+
+                    SizedBox(height: 4.h),
 
                     // TimeStamp
                     Row(
