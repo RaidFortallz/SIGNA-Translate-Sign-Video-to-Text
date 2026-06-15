@@ -1,171 +1,39 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:hand_detection/hand_detection.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:hand_detection/hand_detection.dart';
 import 'package:image/image.dart' as img;
-
-Float32List _buildHeatmapTensor(Map<String, dynamic> params) {
-  final int numFrames = params['numFrames'];
-  final int imgSize = params['imgSize'];
-
-  // poseDataList: List of {lShoulder, rShoulder, lElbow, rElbow, lWrist, rWrist}
-  // handDataList: List of {left: List<[x,y]>, right: List<[x,y]>}
-  final List poseDataList = params['poseDataList'];
-  final List handDataList = params['handDataList'];
-
-  final Float32List tensor = Float32List(numFrames * imgSize * imgSize * 2);
-
-  for (int f = 0; f < numFrames; f++) {
-    final Map poseData = poseDataList[f];
-    final Map handData = handDataList[f];
-
-    // Base offset untuk frame ini
-    final int frameBase = f * imgSize * imgSize * 2;
-    final int ch0 = frameBase;
-    final int ch1 = frameBase + imgSize * imgSize;
-
-    // ── Gambar arm kiri (ch0)
-    _drawArmOnTensor(tensor, ch0, imgSize, poseData, 'l');
-    // ── Gambar arm kanan (ch1)
-    _drawArmOnTensor(tensor, ch1, imgSize, poseData, 'r');
-    // ── Gambar tangan kiri (ch0)
-    if (handData.containsKey('left')) {
-      final List<List<int>> pts = (handData['left'] as List)
-          .map<List<int>>((e) => [e[0] as int, e[1] as int])
-          .toList();
-      _drawHandOnTensor(tensor, ch0, imgSize, pts);
-    }
-
-    // ── Gambar tangan kanan (ch1)
-    if (handData.containsKey('right')) {
-      final List<List<int>> pts = (handData['right'] as List)
-          .map<List<int>>((e) => [e[0] as int, e[1] as int])
-          .toList();
-      _drawHandOnTensor(tensor, ch1, imgSize, pts);
-    }
-  }
-  return tensor;
-}
-
-void _drawArmOnTensor(
-  Float32List tensor,
-  int channelBase,
-  int size,
-  Map poseData,
-  String side,
-) {
-  List<int>? shoulder = _parsePoint(poseData['${side}Shoulder']);
-  List<int>? elbow = _parsePoint(poseData['${side}Elbow']);
-  List<int>? wrist = _parsePoint(poseData['${side}Wrist']);
-
-  if (shoulder != null && elbow != null) {
-    _tensorDrawLine(tensor, channelBase, size, shoulder, elbow);
-  }
-  if (elbow != null && wrist != null) {
-    _tensorDrawLine(tensor, channelBase, size, elbow, wrist);
-  }
-}
-
-void _drawHandOnTensor(
-  Float32List tensor,
-  int channelBase,
-  int size,
-  List<List<int>> pts,
-) {
-  const List<List<int>> handConnections = [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 4],
-    [0, 5],
-    [5, 6],
-    [6, 7],
-    [7, 8],
-    [5, 9],
-    [9, 10],
-    [10, 11],
-    [11, 12],
-    [9, 13],
-    [13, 14],
-    [14, 15],
-    [15, 16],
-    [13, 17],
-    [17, 18],
-    [18, 19],
-    [19, 20],
-    [0, 17],
-  ];
-
-  for (final p in pts) {
-    _tensorDrawPoint(tensor, channelBase, size, p[0], p[1]);
-  }
-
-  for (final conn in handConnections) {
-    final int a = conn[0];
-    final int b = conn[1];
-    if (a < pts.length && b < pts.length) {
-      _tensorDrawLine(tensor, channelBase, size, pts[a], pts[b]);
-    }
-  }
-}
-
-List<int>? _parsePoint(dynamic val) {
-  if (val == null) return null;
-  return [val[0] as int, val[1] as int];
-}
-
-void _tensorDrawPoint(
-  Float32List tensor,
-  int base,
-  int size,
-  int x,
-  int y, {
-  int r = 1,
-}) {
-  for (int i = -r; i <= r; i++) {
-    for (int j = -r; j <= r; j++) {
-      if (i * i + j * j <= r * r) {
-        final int xi = x + i;
-        final int yj = y + j;
-        if (xi >= 0 && xi < size && yj >= 0 && yj < size) {
-          tensor[base + yj * size + xi] = 1.0;
-        }
-      }
-    }
-  }
-}
-
-void _tensorDrawLine(
-  Float32List tensor,
-  int base,
-  int size,
-  List<int> p1,
-  List<int> p2,
-) {
-  final int dx = (p2[0] - p1[0]).abs();
-  final int dy = (p2[1] - p1[1]).abs();
-  final int steps = max(dx, dy) + 1;
-
-  for (int i = 0; i < steps; i++) {
-    final double t = steps == 1 ? 0.0 : i / (steps - 1);
-    final int x = (p1[0] + t * (p2[0] - p1[0])).round();
-    final int y = (p1[1] + t * (p2[1] - p1[1])).round();
-    _tensorDrawPoint(tensor, base, size, x, y);
-  }
-}
 
 class TfliteDataSources {
   Interpreter? interpreter;
   List<String> labels = [];
+  String? loadError;
 
-  final int numFrames = 16;
-  final int imgSize = 128;
+  // ── Konstanta sesuai preprocessing Python (run10 main GRU.py) ──
+  static const int numFrames = 16;
+  static const int imgSize = 128;
+  static const int landmarkDim = 153; // 9 pose*3 + 21 leftHand*3 + 21 rightHand*3
+  static const int featureDim = 306; // landmarkDim + velocity(landmarkDim)
+
+  // POSE_IDS Python: [0,11,12,13,14,15,16,23,24]
+  static const List<PoseLandmarkType> poseIds = [
+    PoseLandmarkType.nose,
+    PoseLandmarkType.leftShoulder,
+    PoseLandmarkType.rightShoulder,
+    PoseLandmarkType.leftElbow,
+    PoseLandmarkType.rightElbow,
+    PoseLandmarkType.leftWrist,
+    PoseLandmarkType.rightWrist,
+    PoseLandmarkType.leftHip,
+    PoseLandmarkType.rightHip,
+  ];
 
   TfliteDataSources() {
     loadModel();
@@ -174,59 +42,61 @@ class TfliteDataSources {
   Future<void> loadModel() async {
     try {
       interpreter = await Interpreter.fromAsset(
-        'assets/model/modelv10.tflite',
+        'assets/model/modelv10_GRU.tflite',
         options: InterpreterOptions()..threads = 4,
       );
-      print("Model 3D CNN berhasil di load");
-      print("   Input : ${interpreter!.getInputTensor(0).shape}");
-      print("   Output: ${interpreter!.getOutputTensor(0).shape}");
+      print("Model GRU berhasil di load");
+      print(
+        "   Input : ${interpreter!.getInputTensor(0).shape} "
+        "(${interpreter!.getInputTensor(0).type})",
+      );
+      print(
+        "   Output: ${interpreter!.getOutputTensor(0).shape} "
+        "(${interpreter!.getOutputTensor(0).type})",
+      );
 
       final String jsonStr = await rootBundle.loadString(
         'assets/model/label_map.json',
       );
       labels = List<String>.from(json.decode(jsonStr));
       print("Labels: ${labels.length} kelas");
+
+      loadError = null;
     } catch (e) {
       print("Gagal load: $e");
+      loadError = e.toString();
     }
   }
 
   Future<Map<String, dynamic>> runInference(String videoPath) async {
     if (interpreter == null || labels.isEmpty) await loadModel();
     if (interpreter == null || labels.isEmpty) {
-      throw Exception("Model belum siap!");
+      throw Exception("Model belum siap! ${loadError ?? 'unknown'}");
     }
 
     try {
-      // ── Step 1: Extract + crop 16 frames
-      print("── [1/4] Extract & crop frames ──");
+      // ── Step 1: Extract 16 frame + fixed shoulder crop ──
+      print("── [1/3] Extract frames & fixed crop ──");
       final List<String> croppedPaths = await _extractAndCropFrames(videoPath);
       if (croppedPaths.isEmpty) {
         return {'label': 'Gagal ekstrak frame', 'confidence': 0.0};
       }
-      // ── Step 2: Pose detection (untuk arm skeleton)
-      print("── [2/4] Pose detection (arm skeleton) ──");
-      final List<Map<String, dynamic>> poseDataList =
-          await _detectPoseAllFrames(croppedPaths);
 
-      // ── Step 3: Hand detection (21 titik jari)
-      print("── [3/4] Hand landmark detection ──");
-      final List<Map<String, dynamic>> handDataList =
-          await _detectHandAllFrames(croppedPaths, poseDataList);
+      // ── Step 2: Landmark extraction per frame → (16, 153) ──
+      print("── [2/3] Landmark extraction ──");
+      final List<List<double>> landmarkSeq = await _extractLandmarkSequence(
+        croppedPaths,
+      );
 
-      // ── Step 4: Build heatmap tensor di isolate
-      print("── [4/4] Build heatmap + inference ──");
-      final Float32List flatTensor = await compute(_buildHeatmapTensor, {
-        'numFrames': numFrames,
-        'imgSize': imgSize,
-        'poseDataList': poseDataList,
-        'handDataList': handDataList,
-      });
+      // ── Step 3: Velocity + concat + forward-fill → (16, 306) ──
+      print("── [3/3] Build feature sequence + inference ──");
+      final List<List<double>> featureSeq = _buildFeatureSequence(landmarkSeq);
 
-      // ── Reshape → nested list [1, 16, 128, 128, 2]
-      final List<dynamic> inputTensor = _reshapeToNestedList(flatTensor);
+      // Reshape ke [1, 16, 306]
+      final List<dynamic> inputTensor = [featureSeq];
 
-      // ── Multi-run: jalankan 3x, average scores
+      // ── Multi-run averaging (GRU + Dropout deterministik saat inference,
+      // tetap dipertahankan sebagai safety net seperti model sebelumnya) ──
       const int numRuns = 3;
       final List<double> avgScores = List.filled(labels.length, 0.0);
 
@@ -239,33 +109,35 @@ class TfliteDataSources {
         }
       }
 
-      // ── Sort scores untuk ambil top-2
       final List<MapEntry<int, double>> ranked =
           avgScores.asMap().entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value));
 
       final int topIdx = ranked[0].key;
       final double topScore = ranked[0].value;
-      final double secScore = ranked.length > 1 ? ranked[1].value : 0.0;
-      final double gap = topScore - secScore; // selisih skor 1 & 2
-
       final double confidence = topScore * 100;
-      final double gapPct = gap * 100;
 
       print("✅ Top-1: ${labels[topIdx]} (${confidence.toStringAsFixed(1)}%)");
-      print(
-        "   Top-2: ${labels[ranked[1].key]} (${(secScore * 100).toStringAsFixed(1)}%)",
-      );
-      print("   Gap  : ${gapPct.toStringAsFixed(1)}%");
+      if (ranked.length > 1) {
+        final double secScore = ranked[1].value;
+        print(
+          "   Top-2: ${labels[ranked[1].key]} "
+          "(${(secScore * 100).toStringAsFixed(1)}%)",
+        );
+      }
 
-      // Confidence
       return {'label': labels[topIdx], 'confidence': confidence};
     } catch (e) {
       throw Exception("Gagal melakukan inferensi: $e");
     }
   }
 
-  // ── Step 1: Extract raw frames → shoulder crop → resize 128x128
+  // ═══════════════════════════════════════════════════════════════════════
+  // STEP 1 — Replikasi get_fixed_crop() + fixed_shoulder_crop():
+  // crop box dihitung SEKALI dari frame pertama (raw), lalu diterapkan
+  // ke semua 16 frame yang disampling.
+  // ═══════════════════════════════════════════════════════════════════════
+
   Future<List<String>> _extractAndCropFrames(String videoPath) async {
     final tempDir = await getTemporaryDirectory();
     final rawDir = Directory('${tempDir.path}/raw_frames');
@@ -285,22 +157,31 @@ class TfliteDataSources {
     print("   Raw frames: ${rawFiles.length}");
     if (rawFiles.isEmpty) return [];
 
-    final List<String> sampledPaths = List.generate(numFrames, (i) {
-      final int idx = (i * rawFiles.length / numFrames).floor().clamp(
-        0,
-        rawFiles.length - 1,
-      );
-      return rawFiles[idx].path;
-    });
+    // ── Replikasi: np.linspace(0, total-1, 16) → unique → astype(int) ──
+    final int totalFrames = rawFiles.length;
+    final Set<int> seen = {};
+    final List<int> sampledIdx = [];
+    for (int i = 0; i < numFrames; i++) {
+      final double t = i * (totalFrames - 1) / (numFrames - 1);
+      final int idx = t.toInt(); // truncate, sama seperti astype(int)
+      if (seen.add(idx)) sampledIdx.add(idx);
+    }
 
-    // crop dari 3 frame
-    final List<int>? cropBox = await _detectShoulderCrop(sampledPaths);
+    final List<String> sampledPaths = sampledIdx
+        .map((idx) => rawFiles[idx].path)
+        .toList();
 
+    print("   Sampled unique frames: ${sampledPaths.length}/$numFrames");
+
+    // ── fixed_crop dihitung SEKALI dari frame pertama (raw, belum crop) ──
+    final List<int>? cropBox = await _getFixedCrop(sampledPaths.first);
+
+    // ── Terapkan crop yang SAMA ke semua frame ──
     final List<String> result = [];
     for (int i = 0; i < sampledPaths.length; i++) {
       final String outPath =
           '${cropDir.path}/crop_${i.toString().padLeft(3, '0')}.jpg';
-      await _applyCropAndResize(sampledPaths[i], outPath, cropBox);
+      await _applyFixedCrop(sampledPaths[i], outPath, cropBox);
       result.add(outPath);
     }
 
@@ -308,35 +189,8 @@ class TfliteDataSources {
     return result;
   }
 
-  Future<List<int>?> _detectShoulderCrop(List<String> sampledPaths) async {
-    // Coba 3 frame: index 0, tengah, terakhir
-    final List<int> candidates = [
-      0,
-      sampledPaths.length ~/ 2,
-      sampledPaths.length - 1,
-    ];
-
-    final List<List<int>> cropBoxes = [];
-
-    for (final idx in candidates) {
-      final box = await _detectShoulderCropFromFrame(sampledPaths[idx]);
-      if (box != null) cropBoxes.add(box);
-    }
-
-    if (cropBoxes.isEmpty) return null;
-
-    // Ambil median dari setiap koordinat (lebih stabil dari average)
-    final List<int> result = List.generate(4, (i) {
-      final vals = cropBoxes.map((b) => b[i]).toList()..sort();
-      return vals[vals.length ~/ 2];
-    });
-
-    print("   Shoulder crop (median dari ${cropBoxes.length} frame): $result");
-    return result;
-  }
-
-  // ── Deteksi shoulder crop dari frame pertama
-  Future<List<int>?> _detectShoulderCropFromFrame(String framePath) async {
+  // get_fixed_crop: shoulder-based crop box dari 1 frame (resolusi raw)
+  Future<List<int>?> _getFixedCrop(String framePath) async {
     try {
       final detector = PoseDetector(
         options: PoseDetectorOptions(mode: PoseDetectionMode.single),
@@ -346,54 +200,61 @@ class TfliteDataSources {
       );
       await detector.close();
 
-      if (poses.isEmpty) return null;
-
-      final pose = poses.first;
       final imgBytes = await File(framePath).readAsBytes();
       final decoded = img.decodeImage(imgBytes);
       if (decoded == null) return null;
 
-      final int w = decoded.width;
-      final int h = decoded.height;
+      final int w0 = decoded.width;
+      final int h0 = decoded.height;
 
+      if (poses.isEmpty) {
+        final int size = min(w0, h0);
+        return [
+          (w0 - size) ~/ 2,
+          (h0 - size) ~/ 2,
+          (w0 + size) ~/ 2,
+          (h0 + size) ~/ 2,
+        ];
+      }
+
+      final pose = poses.first;
       final lSh = pose.landmarks[PoseLandmarkType.leftShoulder];
       final rSh = pose.landmarks[PoseLandmarkType.rightShoulder];
 
       if (lSh == null || rSh == null) {
-        final int size = min(w, h);
+        final int size = min(w0, h0);
         return [
-          (w - size) ~/ 2,
-          (h - size) ~/ 2,
-          (w + size) ~/ 2,
-          (h + size) ~/ 2,
+          (w0 - size) ~/ 2,
+          (h0 - size) ~/ 2,
+          (w0 + size) ~/ 2,
+          (h0 + size) ~/ 2,
         ];
       }
 
-      final int cx = ((lSh.x + rSh.x) / 2).round();
-      final int cy = ((lSh.y + rSh.y) / 2).round();
-      final int shoulderDist = (rSh.x - lSh.x).abs().round();
+      // ML Kit sudah pixel coords di frame asli (= int(lm.x*w0) di Python)
+      final int lx = lSh.x.toInt();
+      final int ly = lSh.y.toInt();
+      final int rx = rSh.x.toInt();
+      final int ry = rSh.y.toInt();
 
-      if (shoulderDist < 10) return null;
+      final int cx = ((lx + rx) / 2).toInt();
+      int cy = ((ly + ry) / 2).toInt();
+      final int shoulderDist = (rx - lx).abs();
 
-      final int offsetX = (shoulderDist * 1.3).round();
-      final int offsetTop = (shoulderDist * 0.9).round();
-      final int offsetBottom = (shoulderDist * 2.5).round();
-      final int cyShifted = cy + (shoulderDist * -0.6).round();
+      final int offsetX = (shoulderDist * 1.3).toInt();
+      final int offsetTop = (shoulderDist * 0.9).toInt();
+      final int offsetBottom = (shoulderDist * 2.5).toInt();
+      cy = cy + (shoulderDist * -0.9).toInt();
 
-      return [
-        cx - offsetX,
-        cyShifted - offsetTop,
-        cx + offsetX,
-        cyShifted + offsetBottom,
-      ];
+      return [cx - offsetX, cy - offsetTop, cx + offsetX, cy + offsetBottom];
     } catch (e) {
-      print("   Crop frame gagal: $e");
+      print("   get_fixed_crop gagal: $e");
       return null;
     }
   }
 
-  // ── Crop + resize 1 frame
-  Future<void> _applyCropAndResize(
+  // fixed_shoulder_crop: crop (+padding kalau keluar batas) → resize 128x128
+  Future<void> _applyFixedCrop(
     String inputPath,
     String outputPath,
     List<int>? cropBox,
@@ -408,7 +269,6 @@ class TfliteDataSources {
     img.Image cropped;
 
     if (cropBox != null) {
-      // Hitung padding kalau box keluar batas
       final int padLeft = max(0, -cropBox[0]);
       final int padTop = max(0, -cropBox[1]);
       final int padRight = max(0, cropBox[2] - w);
@@ -455,157 +315,163 @@ class TfliteDataSources {
     await File(outputPath).writeAsBytes(img.encodeJpg(resized, quality: 90));
   }
 
-  // ── Step 2: Pose detection semua frame
-  Future<List<Map<String, dynamic>>> _detectPoseAllFrames(
-    List<String> paths,
+  // ═══════════════════════════════════════════════════════════════════════
+  // STEP 2 — Replikasi landmark_to_vector():
+  // pose(9×3) + leftHand(21×3) + rightHand(21×3) = 153 nilai/frame,
+  // dinormalisasi relatif center-bahu & lebar-bahu.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  Future<List<List<double>>> _extractLandmarkSequence(
+    List<String> croppedPaths,
   ) async {
-    final detector = PoseDetector(
+    final poseDetector = PoseDetector(
       options: PoseDetectorOptions(mode: PoseDetectionMode.single),
     );
-
-    final List<Map<String, dynamic>> result = [];
-
-    for (final path in paths) {
-      try {
-        final poses = await detector.processImage(
-          InputImage.fromFilePath(path),
-        );
-        if (poses.isNotEmpty) {
-          result.add(_extractArmPoints(poses.first));
-        } else {
-          result.add({});
-        }
-      } catch (_) {
-        result.add({});
-      }
-    }
-
-    await detector.close();
-    return result;
-  }
-
-  Map<String, dynamic> _extractArmPoints(Pose pose) {
-    Map<String, dynamic> data = {};
-
-    void add(String key, PoseLandmarkType type) {
-      final lm = pose.landmarks[type];
-      // Koordinat sudah pixel di gambar 128x128
-      if (lm != null && lm.likelihood > 0.3) {
-        data[key] = [
-          lm.x.round().clamp(0, imgSize - 1),
-          lm.y.round().clamp(0, imgSize - 1),
-        ];
-      }
-    }
-
-    add('lShoulder', PoseLandmarkType.leftShoulder);
-    add('rShoulder', PoseLandmarkType.rightShoulder);
-    add('lElbow', PoseLandmarkType.leftElbow);
-    add('rElbow', PoseLandmarkType.rightElbow);
-    add('lWrist', PoseLandmarkType.leftWrist);
-    add('rWrist', PoseLandmarkType.rightWrist);
-
-    return data;
-  }
-
-  // ── Step 3: Hand detection semua frame
-  Future<List<Map<String, dynamic>>> _detectHandAllFrames(
-    List<String> paths,
-    List<Map<String, dynamic>> poseDataList,
-  ) async {
-    // Buat satu detector, reuse untuk semua frame
-    final HandDetector handDetector = await HandDetector.create(
+    final handDetector = await HandDetector.create(
       performanceConfig: PerformanceConfig.xnnpack(numThreads: 4),
     );
 
-    final List<Map<String, dynamic>> result = [];
+    final List<List<double>> sequence = [];
 
-    for (int i = 0; i < paths.length; i++) {
-      try {
-        final Uint8List imgBytes = await File(paths[i]).readAsBytes();
-        final List<Hand> hands = await handDetector.detect(imgBytes);
+    for (final path in croppedPaths) {
+      sequence.add(await _landmarkToVector(path, poseDetector, handDetector));
+    }
 
-        final Map<String, dynamic> frameData = {};
-        final Map poseData = poseDataList[i];
+    await poseDetector.close();
+    await handDetector.dispose();
 
-        final List<int>? lWrist = _parsePointFromPose(poseData, 'lWrist');
-        final List<int>? rWrist = _parsePointFromPose(poseData, 'rWrist');
+    // ── Padding: kalau frame hasil sampling < 16, ulangi frame terakhir
+    // (sebelum velocity dihitung — sama seperti Python) ──
+    while (sequence.length < numFrames) {
+      sequence.add(List<double>.from(sequence.last));
+    }
 
-        for (final hand in hands.take(2)) {
-          if (!hand.hasLandmarks) continue;
+    return sequence;
+  }
 
-          // Ambil 21 titik
-          final List<List<int>> pts = hand.landmarks
-              .map(
-                (lm) => [
-                  lm.x.round().clamp(0, imgSize - 1),
-                  lm.y.round().clamp(0, imgSize - 1),
-                ],
-              )
-              .toList();
+  Future<List<double>> _landmarkToVector(
+    String framePath,
+    PoseDetector poseDetector,
+    HandDetector handDetector,
+  ) async {
+    final List<double> vector = [];
 
-          // Assign kiri/kanan
-          // Prioritas: handedness dari detector
-          // Fallback: jarak ke wrist dari pose
-          String side;
-          if (hand.handedness == Handedness.left) {
-            side = 'left';
-          } else if (hand.handedness == Handedness.right) {
-            side = 'right';
-          } else {
-            // Fallback: hitung jarak center hand ke wrist pose
-            final double hx =
-                pts.map((p) => p[0]).reduce((a, b) => a + b) / pts.length;
-            final double hy =
-                pts.map((p) => p[1]).reduce((a, b) => a + b) / pts.length;
+    double centerX = 0.5;
+    double centerY = 0.5;
+    double shoulderWidth = 1.0;
 
-            double distL = double.infinity;
-            double distR = double.infinity;
-            if (lWrist != null) {
-              distL = pow(hx - lWrist[0], 2) + pow(hy - lWrist[1], 2) as double;
-            }
-            if (rWrist != null) {
-              distR = pow(hx - rWrist[0], 2) + pow(hy - rWrist[1], 2) as double;
-            }
-            side = distL < distR ? 'left' : 'right';
-          }
+    final poses = await poseDetector.processImage(
+      InputImage.fromFilePath(framePath),
+    );
+    final Pose? pose = poses.isNotEmpty ? poses.first : null;
 
-          frameData[side] = pts;
-        }
-
-        result.add(frameData);
-      } catch (_) {
-        result.add({});
+    if (pose != null) {
+      final lSh = pose.landmarks[PoseLandmarkType.leftShoulder];
+      final rSh = pose.landmarks[PoseLandmarkType.rightShoulder];
+      if (lSh != null && rSh != null) {
+        // Normalisasi pixel (0..128) → 0..1 sesuai skala MediaPipe Tasks
+        final double lx = lSh.x / imgSize;
+        final double ly = lSh.y / imgSize;
+        final double rx = rSh.x / imgSize;
+        final double ry = rSh.y / imgSize;
+        centerX = (lx + rx) / 2;
+        centerY = (ly + ry) / 2;
+        shoulderWidth = (rx - lx).abs();
+        if (shoulderWidth < 1e-6) shoulderWidth = 1e-6;
       }
     }
 
-    await handDetector.dispose();
-    return result;
+    // ── POSE: 9 landmark (POSE_IDS) × 3 (x,y,z) = 27 ──
+    if (pose != null) {
+      for (final type in poseIds) {
+        final lm = pose.landmarks[type];
+        if (lm != null) {
+          final double xNorm = (lm.x / imgSize - centerX) / shoulderWidth;
+          final double yNorm = (lm.y / imgSize - centerY) / shoulderWidth;
+          final double zNorm = (lm.z / imgSize) / shoulderWidth;
+          vector.addAll([xNorm, yNorm, zNorm]);
+        } else {
+          vector.addAll([0.0, 0.0, 0.0]);
+        }
+      }
+    } else {
+      // Tidak ada pose → 27 nol (jaga FEATURE_DIM=306 selalu konsisten,
+      // lihat catatan di bawah soal perbedaan dgn fallback Python)
+      vector.addAll(List.filled(27, 0.0));
+    }
+
+    // ── HAND: leftHand(21×3) + rightHand(21×3) = 126 ──
+    final List<double> leftHand = List.filled(63, 0.0);
+    final List<double> rightHand = List.filled(63, 0.0);
+
+    try {
+      final Uint8List imgBytes = await File(framePath).readAsBytes();
+      final List<Hand> hands = await handDetector.detect(imgBytes);
+
+      for (final hand in hands.take(2)) {
+        if (!hand.hasLandmarks) continue;
+
+        final List<double> coords = [];
+        for (final lm in hand.landmarks) {
+          final double xNorm = (lm.x / imgSize - centerX) / shoulderWidth;
+          final double yNorm = (lm.y / imgSize - centerY) / shoulderWidth;
+          // ASUMSI: hand_detection package punya field .z — lihat catatan
+          final double zNorm = (lm.z / imgSize) / shoulderWidth;
+          coords.addAll([xNorm, yNorm, zNorm]);
+        }
+
+        if (hand.handedness == Handedness.left) {
+          for (int i = 0; i < 63; i++) {
+            leftHand[i] = coords[i];
+          }
+        } else if (hand.handedness == Handedness.right) {
+          for (int i = 0; i < 63; i++) {
+            rightHand[i] = coords[i];
+          }
+        }
+      }
+    } catch (_) {}
+
+    vector.addAll(leftHand);
+    vector.addAll(rightHand);
+
+    return vector; // total 153
   }
 
-  List<int>? _parsePointFromPose(Map data, String key) {
-    if (!data.containsKey(key)) return null;
-    final v = data[key];
-    return [v[0] as int, v[1] as int];
-  }
+  // ═══════════════════════════════════════════════════════════════════════
+  // STEP 3 — velocity + concat + forward_fill_sequence → (16, 306)
+  // ═══════════════════════════════════════════════════════════════════════
 
-  // ── Reshape flat Float32List → nested list [1,16,128,128,2]
-  List<dynamic> _reshapeToNestedList(Float32List flat) {
-    return List.generate(
-      1,
-      (_) => List.generate(
-        numFrames,
-        (f) => List.generate(
-          imgSize,
-          (y) => List.generate(imgSize, (x) {
-            final int frameBase = f * imgSize * imgSize * 2;
-            final int ch0Idx = frameBase + y * imgSize + x;
-            final int ch1Idx = frameBase + imgSize * imgSize + y * imgSize + x;
-            return [flat[ch0Idx], flat[ch1Idx]];
-          }),
-        ),
-      ),
+  List<List<double>> _buildFeatureSequence(List<List<double>> landmarkSeq) {
+    final int n = landmarkSeq.length; // 16
+    final int d = landmarkDim; // 153
+
+    final List<List<double>> velocity = List.generate(
+      n,
+      (_) => List.filled(d, 0.0),
     );
+    for (int i = 1; i < n; i++) {
+      for (int j = 0; j < d; j++) {
+        velocity[i][j] = landmarkSeq[i][j] - landmarkSeq[i - 1][j];
+      }
+    }
+
+    final List<List<double>> combined = List.generate(n, (i) {
+      return [...landmarkSeq[i], ...velocity[i]];
+    });
+
+    // forward_fill_sequence: kalau frame (306-dim) all-zero, ganti last_valid
+    List<double>? lastValid;
+    for (int i = 0; i < n; i++) {
+      final bool isAllZero = combined[i].every((v) => v == 0.0);
+      if (!isAllZero) {
+        lastValid = List<double>.from(combined[i]);
+      } else if (lastValid != null) {
+        combined[i] = List<double>.from(lastValid);
+      }
+    }
+
+    return combined; // (16, 306)
   }
 
   void close() => interpreter?.close();

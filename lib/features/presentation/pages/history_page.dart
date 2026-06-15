@@ -55,6 +55,7 @@ class HistoryPage extends StatelessWidget {
               : item.text;
 
           return GestureDetector(
+            key: ValueKey(item.id),
             onTap: () {
               controller.currentResult.value = item;
               Get.toNamed(RouteNames.result);

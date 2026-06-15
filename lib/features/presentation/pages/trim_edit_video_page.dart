@@ -138,22 +138,24 @@ class TrimEditVideoPage extends StatelessWidget {
 
             // TRIM CONTROL
             Obx(() {
-              final totalMs = controller.duration.value.inMilliseconds;
-              final startDur = Duration(
-                milliseconds: (controller.trimRange.value.start * totalMs)
-                    .round(),
+              final int totalMs = controller.duration.value.inMilliseconds;
+              final int activeIdx = controller.activeSegmentIdx.value;
+              final RangeValues activeSeg = controller.activeSegment;
+
+              final Duration startDur = Duration(
+                milliseconds: (activeSeg.start * totalMs).round(),
               );
-              final endDur = Duration(
-                milliseconds: (controller.trimRange.value.end * totalMs)
-                    .round(),
+              final Duration endDur = Duration(
+                milliseconds: (activeSeg.end * totalMs).round(),
               );
-              final selectedSec = (endDur - startDur).inMilliseconds / 1000.0;
-              final posRatio = totalMs == 0
+              final double selectedSec =
+                  (endDur - startDur).inMilliseconds / 1000.0;
+              final double posRatio = totalMs == 0
                   ? 0.0
-                  : (controller.position.value.inMilliseconds /
-                        totalMs).clamp(0.0, 1.0);
-              final startRatio = controller.trimRange.value.start;
-              final endRatio = controller.trimRange.value.end;
+                  : (controller.position.value.inMilliseconds / totalMs).clamp(
+                      0.0,
+                      1.0,
+                    );
 
               return Container(
                 margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -169,19 +171,20 @@ class TrimEditVideoPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // label intruksi
+                    // ── Label instruksi ────────────────────────────────────────────
                     Row(
                       children: [
                         Icon(
                           Icons.content_cut_rounded,
                           color: WarnaApp.wrOrange,
-                          size: 16.sp,
+                          size: 14.sp,
                         ),
                         SizedBox(width: 6.w),
-
                         Expanded(
                           child: TextCustom(
-                            "Potong bagian diam, sisakan gerakan isyarat saja",
+                            controller.segments.length == 1
+                                ? "Atur segmen, atau tambah segmen baru per gerakan"
+                                : "${controller.segments.length} segmen → akan digabung jadi kalimat",
                             fontSize: 11,
                             color: WarnaApp.wrWhite.withValues(alpha: 0.6),
                           ),
@@ -190,14 +193,14 @@ class TrimEditVideoPage extends StatelessWidget {
                     ),
                     SizedBox(height: 14.h),
 
-                    // Progres saat ini
-                    //Progress bar dengan trim zone highlight
+                    // ── Progress bar: semua segmen ditampilkan ─────────────────────
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final double w = constraints.maxWidth;
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
+                            // Track background
                             ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: Container(
@@ -205,19 +208,32 @@ class TrimEditVideoPage extends StatelessWidget {
                                 color: WarnaApp.wrWhite.withValues(alpha: 0.1),
                               ),
                             ),
-                            // Zona trim (highlight antara start–end)
-                            Positioned(
-                              left: startRatio * w,
-                              width: (endRatio - startRatio) * w,
-                              top: 0,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: Container(
-                                  height: 5.h,
-                                  color: WarnaApp.wrRed.withValues(alpha: 0.35),
+
+                            // Semua segmen
+                            ...controller.segments.asMap().entries.map((entry) {
+                              final bool isActive = entry.key == activeIdx;
+                              final double left = entry.value.start * w;
+                              final double width =
+                                  (entry.value.end - entry.value.start) * w;
+                              return Positioned(
+                                left: left,
+                                width: width.clamp(2.0, w),
+                                top: 0,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Container(
+                                    height: 5.h,
+                                    color: isActive
+                                        ? WarnaApp.wrRed
+                                        : WarnaApp.wrBlue.withValues(
+                                            alpha: 0.55,
+                                          ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            }),
+
+                            // Playhead
                             Positioned(
                               left: (posRatio * w - 1).clamp(0, w - 2),
                               top: -2.h,
@@ -235,9 +251,124 @@ class TrimEditVideoPage extends StatelessWidget {
                       },
                     ),
 
-                    SizedBox(height: 16.h),
+                    SizedBox(height: 12.h),
 
-                    // Range Slider
+                    // ── Segment chips + tombol tambah ──────────────────────────────
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ...controller.segments.asMap().entries.map((entry) {
+                            final int idx = entry.key;
+                            final bool isActive = idx == activeIdx;
+                            return GestureDetector(
+                              onTap: () => controller.setActiveSegment(idx),
+                              child: Container(
+                                margin: EdgeInsets.only(right: 8.w),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10.w,
+                                  vertical: 5.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? WarnaApp.wrRed.withValues(alpha: 0.15)
+                                      : WarnaApp.wrWhite.withValues(
+                                          alpha: 0.05,
+                                        ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isActive
+                                        ? WarnaApp.wrRed.withValues(alpha: 0.6)
+                                        : WarnaApp.wrWhite.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextCustom(
+                                      "Kata ${idx + 1}",
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isActive
+                                          ? WarnaApp.wrRed
+                                          : WarnaApp.wrWhite.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                    ),
+                                    if (controller.segments.length > 1) ...[
+                                      SizedBox(width: 5.w),
+                                      GestureDetector(
+                                        onTap: () =>
+                                            controller.removeSegment(idx),
+                                        child: Icon(
+                                          Icons.close_rounded,
+                                          size: 13.sp,
+                                          color: isActive
+                                              ? WarnaApp.wrRed.withValues(
+                                                  alpha: 0.8,
+                                                )
+                                              : WarnaApp.wrWhite.withValues(
+                                                  alpha: 0.35,
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+
+                          // Tombol + tambah segmen
+                          GestureDetector(
+                            onTap: controller.addSegment,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10.w,
+                                vertical: 5.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: WarnaApp.wrWhite.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: WarnaApp.wrWhite.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.add_rounded,
+                                    size: 13.sp,
+                                    color: WarnaApp.wrWhite.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3.w),
+                                  TextCustom(
+                                    "Tambah",
+                                    fontSize: 11,
+                                    color: WarnaApp.wrWhite.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 14.h),
+
+                    // ── RangeSlider untuk segmen aktif ─────────────────────────────
                     SliderTheme(
                       data: SliderThemeData(
                         activeTrackColor: WarnaApp.wrRed,
@@ -256,13 +387,11 @@ class TrimEditVideoPage extends StatelessWidget {
                         minThumbSeparation: 20,
                       ),
                       child: RangeSlider(
-                        values: controller.trimRange.value,
+                        values: activeSeg,
                         min: 0.0,
                         max: 1.0,
-                        onChanged: controller.updateTrimRange,
-                        onChangeStart: (values) {
-                          controller.player.pause();
-                        },
+                        onChanged: controller.updateActiveSegment,
+                        onChangeStart: (_) => controller.player.pause(),
                         onChangeEnd: (values) {
                           final int ms =
                               (values.start *
@@ -275,7 +404,7 @@ class TrimEditVideoPage extends StatelessWidget {
 
                     SizedBox(height: 4.h),
 
-                    // TimeStamp
+                    // ── Timestamps segmen aktif ────────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -283,7 +412,6 @@ class TrimEditVideoPage extends StatelessWidget {
                           label: "Mulai",
                           time: controller.formatDuration(startDur),
                         ),
-                        // Durasi Segmen
                         Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 10.w,
@@ -294,14 +422,14 @@ class TrimEditVideoPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: TextCustom(
-                            "${selectedSec.toStringAsFixed(1)}s dipilih",
+                            "${selectedSec.toStringAsFixed(1)}s",
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: WarnaApp.wrRed,
                           ),
                         ),
                         _TimeChip(
-                          label: "selesai",
+                          label: "Selesai",
                           time: controller.formatDuration(endDur),
                           alignEnd: true,
                         ),

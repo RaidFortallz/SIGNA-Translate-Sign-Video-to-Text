@@ -23,12 +23,32 @@ class _CameraPageState extends State<CameraPage> {
 
   final ValueNotifier<int> _durationNotifer = ValueNotifier(0);
   final ValueNotifier<bool> _blinkNotifier = ValueNotifier(true);
+  final ValueNotifier<double> _brightnessNotifier = ValueNotifier(0.0);
   Timer? _timer;
   int _ticks = 0; //buat hitung putaran timer
+
+  late SensorConfig _sensorConfig;
 
   @override
   void initState() {
     super.initState();
+    _initSensorConfig();
+  }
+
+  void _initSensorConfig() {
+    _sensorConfig = SensorConfig.single(
+      sensor: Sensor.position(_currentSensor),
+      flashMode: FlashMode.none,
+      aspectRatio: CameraAspectRatios.ratio_16_9,
+    );
+    // Reset brightness ke 0 tiap kali sensor berganti
+    _brightnessNotifier.value = 0.0;
+  }
+
+  // Panggil setBrightness langsung ke sensorConfig yang tersimpan
+  void _applyBrightness(double val) {
+    _brightnessNotifier.value = val;
+    _sensorConfig.setBrightness(val);
   }
 
   void _startTimer() {
@@ -40,9 +60,7 @@ class _CameraPageState extends State<CameraPage> {
       _blinkNotifier.value = !_blinkNotifier.value;
       _ticks++;
 
-      if (_ticks % 2 == 0) {
-        _durationNotifer.value++;
-      }
+      if (_ticks % 2 == 0) _durationNotifer.value++;
     });
   }
 
@@ -72,16 +90,35 @@ class _CameraPageState extends State<CameraPage> {
       backgroundColor: WarnaApp.wrTextBlack,
       // CAMERA PREVIEW
       body: CameraAwesomeBuilder.custom(
-        
+        enablePhysicalButton: true,
         mirrorFrontCamera: true,
         saveConfig: SaveConfig.video(),
         filter: AwesomeFilter.None,
         previewFit: CameraPreviewFit.contain,
-        sensorConfig: SensorConfig.single(
-          sensor: Sensor.position(_currentSensor),
-          flashMode: FlashMode.none,
-          aspectRatio: CameraAspectRatios.ratio_16_9,
+        sensorConfig: _sensorConfig,
+
+        progressIndicator: const Center(
+          child: CircularProgressIndicator(color: WarnaApp.wrRed),
         ),
+        onPreviewTapBuilder: (state) => OnPreviewTap(
+          onTap: (position, flutterPreviewSize, pixelPreviewSize) {
+            state.when(
+              onVideoMode: (s) => s.focusOnPoint(
+                flutterPosition: position,
+                pixelPreviewSize: pixelPreviewSize,
+                flutterPreviewSize: flutterPreviewSize,
+              ),
+              onVideoRecordingMode: (s) => s.focusOnPoint(
+                flutterPosition: position,
+                pixelPreviewSize: pixelPreviewSize,
+                flutterPreviewSize: flutterPreviewSize,
+              ),
+            );
+          },
+        ),
+
+        onPreviewScaleBuilder: (state) =>
+            OnPreviewScale(onScale: (scale) => _sensorConfig.setZoom(scale)),
 
         onMediaCaptureEvent: (event) {
           if (_isProcessing) return;
@@ -113,7 +150,6 @@ class _CameraPageState extends State<CameraPage> {
             onPhotoMode: (state) => null,
             onVideoMode: (videoState) {
               isRecording = false;
-              // videoState.sensorConfig.setBrightness(0.3);
               onRecordTap = () {
                 videoState.startRecording();
                 _startTimer();
@@ -291,6 +327,7 @@ class _CameraPageState extends State<CameraPage> {
                                           _currentSensor == SensorPosition.back
                                           ? SensorPosition.front
                                           : SensorPosition.back;
+                                      _initSensorConfig();
                                     });
                                   },
                                   icon: Icon(
@@ -323,35 +360,6 @@ class _CameraPageState extends State<CameraPage> {
                 child: ClipRRect(
                   child: Stack(
                     children: [
-                      Positioned.fill(
-                        child: cameraState.when(
-                          onPreparingCamera: (_) => const Center(
-                            child: CircularProgressIndicator(
-                              color: WarnaApp.wrRed,
-                            ),
-                          ),
-                          onVideoMode: (state) => AwesomeCameraGestureDetector(
-                            onPreviewScale: OnPreviewScale(
-                              onScale: (scale) {
-                                state.sensorConfig.setZoom(scale);
-                              },
-                            ),
-                            child: Container(color: Colors.transparent),
-                          ),
-                          onVideoRecordingMode: (state) =>
-                              AwesomeCameraGestureDetector(
-                                onPreviewScale: OnPreviewScale(
-                                  onScale: (scale) {
-                                    state.sensorConfig.setZoom(scale);
-                                  },
-                                ),
-                                child: Container(color: Colors.transparent),
-                              ),
-
-                          onPhotoMode: (_) => const SizedBox.shrink(),
-                        ),
-                      ),
-
                       if (!isRecording)
                         Center(
                           child: IgnorePointer(
@@ -395,6 +403,55 @@ class _CameraPageState extends State<CameraPage> {
                   ),
                 ),
               ),
+              if (!isRecording)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.w,
+                    vertical: 4.h,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.brightness_low,
+                        color: WarnaApp.wrWhite.withValues(alpha: 0.5),
+                        size: 18.sp,
+                      ),
+                      Expanded(
+                        child: ValueListenableBuilder<double>(
+                          valueListenable: _brightnessNotifier,
+                          builder: (context, brightness, _) => SliderTheme(
+                            data: SliderThemeData(
+                              activeTrackColor: WarnaApp.wrWhite.withValues(
+                                alpha: 0.6,
+                              ),
+                              inactiveTrackColor: WarnaApp.wrWhite.withValues(
+                                alpha: 0.15,
+                              ),
+                              thumbColor: WarnaApp.wrWhite,
+                              overlayShape: SliderComponentShape.noOverlay,
+                              trackHeight: 2.h,
+                              thumbShape: RoundSliderThumbShape(
+                                enabledThumbRadius: 6.r,
+                              ),
+                            ),
+                            child: Slider(
+                              value: brightness,
+                              min: -1.0,
+                              max: 1.0,
+                              onChanged: _applyBrightness,
+                              onChangeEnd: _applyBrightness,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.brightness_high,
+                        color: WarnaApp.wrWhite.withValues(alpha: 0.5),
+                        size: 18.sp,
+                      ),
+                    ],
+                  ),
+                ),
               _buildBottomControls(
                 isRecording: isRecording,
                 onRecordTap: onRecordTap ?? () {},

@@ -23,10 +23,7 @@ class TranslationRepositoryImpl implements ITranslationRepository {
     Duration? trimStart,
     Duration? trimEnd,
   }) async {
-    final aiResult = await aiSource.runInference(
-      path,
-      
-    );
+    final aiResult = await aiSource.runInference(path);
 
     final newTranslation = TranslationModel(
       id: const Uuid().v4(),
@@ -39,6 +36,23 @@ class TranslationRepositoryImpl implements ITranslationRepository {
     await clouSource.saveToFirestore(newTranslation.toJson());
 
     return newTranslation.toEntity();
+  }
+
+  @override
+  Future<TranslationEntity> saveResult({
+    required String text,
+    required double accuracy,
+    required String videoPath,
+  }) async {
+    final newTransltaion = TranslationModel(
+      id: const Uuid().v4(),
+      text: text,
+      accuracy: accuracy,
+      videoPath: videoPath,
+      timestamp: DateTime.now(),
+    );
+    await clouSource.saveToFirestore(newTransltaion.toJson());
+    return newTransltaion.toEntity();
   }
 
   @override

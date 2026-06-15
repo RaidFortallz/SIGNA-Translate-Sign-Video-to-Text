@@ -1,16 +1,16 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:signa_video_to_text/features/config/helper/upload_video_source_option.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
+import 'package:signa_video_to_text/features/data/data_sources/tflite_data_sources.dart';
 import 'package:signa_video_to_text/features/domain/entities/translation_entity.dart';
+import 'package:signa_video_to_text/features/domain/repositories/translation_repository.dart';
 import 'package:signa_video_to_text/features/domain/usecases/delete_history_usecase.dart';
 import 'package:signa_video_to_text/features/domain/usecases/get_history_usecase.dart';
 import 'package:signa_video_to_text/features/domain/usecases/translate_video_usecase.dart';
@@ -31,7 +31,6 @@ class TranslationController extends GetxController {
   var currentResult = Rxn<TranslationEntity>();
   var videoSource = 'rekam'.obs;
   var isFrontCamera = false.obs;
-  
 
   @override
   void onInit() {
@@ -41,39 +40,12 @@ class TranslationController extends GetxController {
 
   Future<void> uploadVideo() async {
     try {
-      final String? source = await Get.bottomSheet<String>(
-        // Tampilkan bottom sheet pilihan
-        UploadSourceSheet(),
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-      );
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
 
-      if (source == null) return;
+      if (video == null) return;
 
-      String? videoPath;
-
-      if (source == 'gallery') {
-        final ImagePicker picker = ImagePicker();
-        final XFile? video = await picker.pickVideo(
-          source: ImageSource.gallery,
-        );
-
-        if (video != null) {
-          videoPath = video.path;
-        }
-      } else {
-        // file manager
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['mp4'],
-        );
-
-        if (result != null && result.files.single.path != null) {
-          videoPath = result.files.single.path;
-        }
-      }
-
-      if (videoPath == null || videoPath.isEmpty) return;
+      final String videoPath = video.path;
 
       if (!videoPath.toLowerCase().endsWith('.mp4')) {
         Get.defaultDialog(
@@ -110,6 +82,134 @@ class TranslationController extends GetxController {
     }
   }
 
+  Future<void> processSegments(
+    String originalPath,
+    List<RangeValues> segments,
+    int totalDurationMs,
+  ) async {
+    try {
+      isLoading.value = true;
+      currentResult.value = null;
+
+      // 1. Simpan video asli ke permanent path (untuk preview di result page)
+      final directory = await getApplicationSupportDirectory();
+      final String timestamp = DateTime.now().millisecondsSinceEpoch
+          .toString()
+          .substring(5);
+      final String safeFileName = 'signa_vid_$timestamp.mp4';
+      final String permanentPath = p.join(directory.path, safeFileName);
+
+      final bool needFlip = isFrontCamera.value;
+
+      if (needFlip) {
+        final session = await FFmpegKit.execute(
+          '-i "$originalPath" -vf hflip '
+          '-c:v libx264 -preset ultrafast -crf 22 -an '
+          '-y "$permanentPath"',
+        );
+        final rc = await session.getReturnCode();
+        if (!ReturnCode.isSuccess(rc)) {
+          await File(originalPath).copy(permanentPath);
+        }
+      } else {
+        await File(originalPath).copy(permanentPath);
+      }
+
+      // Hapus cache asli
+      final File cacheFile = File(originalPath);
+      if (await cacheFile.exists()) await cacheFile.delete();
+
+      print("Permanent: $permanentPath | Segmen: ${segments.length}");
+
+      // 2. Inferensi per segmen
+      final tflite = Get.find<TfliteDataSources>();
+      final tempDir = await getTemporaryDirectory();
+
+      final List<String> words = [];
+      final List<double> confidences = [];
+      String? lastError;
+
+      for (int i = 0; i < segments.length; i++) {
+        final RangeValues seg = segments[i];
+        final Duration segStart = Duration(
+          milliseconds: (seg.start * totalDurationMs).round(),
+        );
+        final Duration segEnd = Duration(
+          milliseconds: (seg.end * totalDurationMs).round(),
+        );
+
+        print(
+          "── Segmen ${i + 1}/${segments.length}: "
+          "${_toFFmpegTime(segStart)} → ${_toFFmpegTime(segEnd)}",
+        );
+
+        final String segTempPath = '${tempDir.path}/seg_${i}_$timestamp.mp4';
+
+        final session = await FFmpegKit.execute(
+          '-ss ${_toFFmpegTime(segStart)} '
+          '-to ${_toFFmpegTime(segEnd)} '
+          '-i "$permanentPath" '
+          '-c copy -y "$segTempPath"',
+        );
+        final rc = await session.getReturnCode();
+
+        if (!ReturnCode.isSuccess(rc)) {
+          print("   Segmen ${i + 1}: FFmpeg gagal, skip");
+          continue;
+        }
+
+        try {
+          final Map<String, dynamic> result = await tflite.runInference(
+            segTempPath,
+          );
+          final String label = result['label'] as String;
+          final double confidence = (result['confidence'] as num).toDouble();
+          words.add(label);
+          confidences.add(confidence);
+          print("Segmen ${i + 1}: $label (${confidence.toStringAsFixed(1)}%)");
+        } catch (e) {
+          print("   ❌ Segmen ${i + 1} inferensi gagal: $e");
+          lastError = e.toString();
+        } finally {
+          final File segFile = File(segTempPath);
+          if (await segFile.exists()) await segFile.delete();
+        }
+      }
+
+      if (words.isEmpty) {
+        throw Exception(
+          "Semua segmen gagal diproses: ${lastError ?? 'unknown error'}",
+        );
+      }
+
+      final String combinedText = words.join(' ');
+      final double avgConfidence = confidences.isEmpty
+          ? 0.0
+          : confidences.reduce((a, b) => a + b) / confidences.length;
+
+      print(
+        "Kalimat: '$combinedText' "
+        "(conf avg: ${avgConfidence.toStringAsFixed(1)}%)",
+      );
+
+      // 3. Simpan ke Firestore via repository
+      final repo = Get.find<ITranslationRepository>();
+      final entity = await repo.saveResult(
+        text: combinedText,
+        accuracy: avgConfidence,
+        videoPath: permanentPath,
+      );
+
+      currentResult.value = entity;
+      await loadHistory();
+    } catch (e) {
+      Get.snackbar('Error Proses', e.toString());
+    } finally {
+      isLoading.value = false;
+      isFrontCamera.value = false;
+    }
+  }
+
   Future<void> processVideoPath(
     String path, {
     Duration? trimStart,
@@ -128,37 +228,35 @@ class TranslationController extends GetxController {
 
       final bool hasTrim = trimStart != null && trimEnd != null;
       final bool needFlip = isFrontCamera.value;
-      
 
       // Tentukan filter video
-      final String vfFlag    = needFlip ? '-vf hflip ' : '';
-    final String codecFlag = needFlip
-        ? '-c:v libx264 -preset ultrafast -crf 22 -an '
-        : '-c copy ';
-      
+      final String vfFlag = needFlip ? '-vf hflip ' : '';
+      final String codecFlag = needFlip
+          ? '-c:v libx264 -preset ultrafast -crf 22 -an '
+          : '-c copy ';
 
       if (hasTrim) {
-      final session = await FFmpegKit.execute(
-        '-ss ${_toFFmpegTime(trimStart)} '
-        '-to ${_toFFmpegTime(trimEnd)} '
-        '-i "$path" '
-        '$vfFlag'
-        '$codecFlag'
-        '-y "$permanentPath"',
-      );
-      final rc = await session.getReturnCode();
-      if (!ReturnCode.isSuccess(rc)) await File(path).copy(permanentPath);
-    } else {
-      if (needFlip) {
         final session = await FFmpegKit.execute(
-          '-i "$path" $vfFlag$codecFlag-y "$permanentPath"',
+          '-ss ${_toFFmpegTime(trimStart)} '
+          '-to ${_toFFmpegTime(trimEnd)} '
+          '-i "$path" '
+          '$vfFlag'
+          '$codecFlag'
+          '-y "$permanentPath"',
         );
         final rc = await session.getReturnCode();
         if (!ReturnCode.isSuccess(rc)) await File(path).copy(permanentPath);
       } else {
-        await File(path).copy(permanentPath);
+        if (needFlip) {
+          final session = await FFmpegKit.execute(
+            '-i "$path" $vfFlag$codecFlag-y "$permanentPath"',
+          );
+          final rc = await session.getReturnCode();
+          if (!ReturnCode.isSuccess(rc)) await File(path).copy(permanentPath);
+        } else {
+          await File(path).copy(permanentPath);
+        }
       }
-    }
 
       print("Source path: $path");
       print("Target path: $permanentPath");
@@ -216,6 +314,4 @@ class TranslationController extends GetxController {
     final ms = d.inMilliseconds.remainder(1000).toString().padLeft(3, '0');
     return '$h:$m:$s.$ms';
   }
-
-  
 }
