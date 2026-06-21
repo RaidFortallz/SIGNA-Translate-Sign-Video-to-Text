@@ -77,27 +77,22 @@ class TfliteDataSources {
 
     try {
       // ── Step 1: Extract 16 frame + fixed shoulder crop ──
-      print("── [1/3] Extract frames & fixed crop ──");
       final List<String> croppedPaths = await _extractAndCropFrames(videoPath);
       if (croppedPaths.isEmpty) {
         return {'label': 'Gagal ekstrak frame', 'confidence': 0.0};
       }
 
       // ── Step 2: Landmark extraction per frame → (16, 153) ──
-      print("── [2/3] Landmark extraction ──");
       final List<List<double>> landmarkSeq = await _extractLandmarkSequence(
         croppedPaths,
       );
 
       // ── Step 3: Velocity + concat + forward-fill → (16, 306) ──
-      print("── [3/3] Build feature sequence + inference ──");
       final List<List<double>> featureSeq = _buildFeatureSequence(landmarkSeq);
 
       // Reshape ke [1, 16, 306]
       final List<dynamic> inputTensor = [featureSeq];
 
-      // ── Multi-run averaging (GRU + Dropout deterministik saat inference,
-      // tetap dipertahankan sebagai safety net seperti model sebelumnya) ──
       const int numRuns = 3;
       final List<double> avgScores = List.filled(labels.length, 0.0);
 
@@ -118,11 +113,11 @@ class TfliteDataSources {
       final double topScore = ranked[0].value;
       final double confidence = topScore * 100;
 
-      print("✅ Top-1: ${labels[topIdx]} (${confidence.toStringAsFixed(1)}%)");
+      print("Top-1: ${labels[topIdx]} (${confidence.toStringAsFixed(1)}%)");
       if (ranked.length > 1) {
         final double secScore = ranked[1].value;
         print(
-          "   Top-2: ${labels[ranked[1].key]} "
+          "Top-2: ${labels[ranked[1].key]} "
           "(${(secScore * 100).toStringAsFixed(1)}%)",
         );
       }
@@ -184,13 +179,6 @@ class TfliteDataSources {
       'cropBox': cropBox,
       'imgSize': imgSize,
     });
-
-    // for (int i = 0; i < sampledPaths.length; i++) {
-    //   final String outPath =
-    //       '${cropDir.path}/crop_${i.toString().padLeft(3, '0')}.jpg';
-    //   await _applyFixedCrop(sampledPaths[i], outPath, cropBox);
-    //   result.add(outPath);
-    // }
 
     print("   Cropped frames: ${result.length}");
     return result;
@@ -259,74 +247,6 @@ class TfliteDataSources {
       return null;
     }
   }
-
-  // fixed_shoulder_crop: crop (+padding kalau keluar batas) → resize 128x128
-  // Future<void> _applyFixedCrop(
-  //   String inputPath,
-  //   String outputPath,
-  //   List<int>? cropBox,
-  // ) async {
-  //   final Uint8List bytes = await File(inputPath).readAsBytes();
-  //   final img.Image? decoded = img.decodeImage(bytes);
-  //   if (decoded == null) return;
-
-  //   final int w = decoded.width;
-  //   final int h = decoded.height;
-
-  //   img.Image cropped;
-
-  //   if (cropBox != null) {
-  //     final int padLeft = max(0, -cropBox[0]);
-  //     final int padTop = max(0, -cropBox[1]);
-  //     final int padRight = max(0, cropBox[2] - w);
-  //     final int padBottom = max(0, cropBox[3] - h);
-
-  //     final int x1 = max(0, cropBox[0]);
-  //     final int y1 = max(0, cropBox[1]);
-  //     final int x2 = min(w, cropBox[2]);
-  //     final int y2 = min(h, cropBox[3]);
-
-  //     cropped = img.copyCrop(
-  //       decoded,
-  //       x: x1,
-  //       y: y1,
-  //       width: x2 - x1,
-  //       height: y2 - y1,
-  //     );
-
-  //     if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-  //       cropped = img.copyExpandCanvas(
-  //         cropped,
-  //         newWidth: cropped.width + padLeft + padRight,
-  //         newHeight: cropped.height + padTop + padBottom,
-  //         position: img.ExpandCanvasPosition.topLeft,
-  //         backgroundColor: img.ColorRgb8(0, 0, 0),
-  //       );
-  //     }
-  //   } else {
-  //     final int size = min(w, h);
-  //     cropped = img.copyCrop(
-  //       decoded,
-  //       x: (w - size) ~/ 2,
-  //       y: (h - size) ~/ 2,
-  //       width: size,
-  //       height: size,
-  //     );
-  //   }
-
-  //   final img.Image resized = img.copyResize(
-  //     cropped,
-  //     width: imgSize,
-  //     height: imgSize,
-  //   );
-  //   await File(outputPath).writeAsBytes(img.encodeJpg(resized, quality: 90));
-  // }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // STEP 2 — Replikasi landmark_to_vector():
-  // pose(9×3) + leftHand(21×3) + rightHand(21×3) = 153 nilai/frame,
-  // dinormalisasi relatif center-bahu & lebar-bahu.
-  // ═══════════════════════════════════════════════════════════════════════
 
   Future<List<List<double>>> _extractLandmarkSequence(
     List<String> croppedPaths,
