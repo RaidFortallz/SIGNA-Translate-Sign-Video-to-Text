@@ -1,14 +1,109 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
+import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
   final controller = Get.find<TranslationController>();
 
-  HomePage({super.key});
+  final GlobalKey _recordKey = GlobalKey();
+  final GlobalKey _uploadKey = GlobalKey();
+
+  void _showHomeTutorial() {
+    final tutCtrl = Get.find<AppTutorialController>();
+    const total = 2;
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: 'home_record',
+          keyTarget: _recordKey,
+          shape: ShapeLightFocus.Circle,
+          paddingFocus: 12,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🎥',
+                title: 'Rekam Video Langsung',
+                description:
+                    'Ketuk tombol ini untuk membuka kamera dan merekam gerakan bahasa isyarat BISINDO secara langsung.',
+                step: 1,
+                total: total,
+                alwaysShowNext: true,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'home_upload',
+          keyTarget: _uploadKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 16,
+          paddingFocus: 8,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '📁',
+                title: 'Upload Video BISINDO',
+                description:
+                    'Sudah punya video? Pilih video BISINDO dari galeri perangkat untuk diterjemahkan oleh AI SIGNA.',
+                step: 2,
+                total: total,
+                alwaysShowNext: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: WarnaApp.wrBlack,
+      opacityShadow: 0.85,
+      paddingFocus: 10,
+      focusAnimationDuration: const Duration(milliseconds: 350),
+      unFocusAnimationDuration: const Duration(milliseconds: 300),
+      alignSkip: Alignment.topRight,
+      skipWidget: Container(
+        margin: EdgeInsets.only(top: 52.h, right: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
+        decoration: BoxDecoration(
+          color: WarnaApp.wrWhite.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: WarnaApp.wrWhite.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: TextCustom(
+          "Lewati",
+          fontSize: 12,
+          color: WarnaApp.wrWhite,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onFinish: () {
+        tutCtrl.startTutorial();
+        Get.toNamed(RouteNames.trim, arguments: '__tutorial__');
+      },
+      onSkip: () {
+        return true;
+      },
+    ).show(context: context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +150,7 @@ class HomePage extends StatelessWidget {
                 SizedBox(height: 44.h),
 
                 InkWell(
+                  key: _recordKey,
                   onTap: () => controller.recordVideo(),
                   borderRadius: BorderRadius.circular(100),
                   child: Container(
@@ -82,6 +178,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 26.h),
+
                 GestureDetector(
                   onTap: () => controller.recordVideo(),
                   child: Container(
@@ -156,6 +253,7 @@ class HomePage extends StatelessWidget {
                 GestureDetector(
                   onTap: () => controller.uploadVideo(),
                   child: Container(
+                    key: _uploadKey,
                     width: double.infinity,
                     padding: EdgeInsets.symmetric(vertical: 16.h),
                     decoration: BoxDecoration(
@@ -192,36 +290,7 @@ class HomePage extends StatelessWidget {
           top: 44.w,
           width: 74.w,
           child: IconButton(
-            onPressed: () {
-              Get.snackbar(
-                "Tips Merekam",
-                "Pastikan gerakan tangan dan isyarat terlihat jelas di dalam frame kamera.",
-                backgroundColor: WarnaApp.wrWhite,
-                colorText: WarnaApp.wrTextBlack,
-                snackPosition: SnackPosition.TOP,
-                margin: EdgeInsets.only(top: 24.h, left: 16.w, right: 16.w),
-                borderRadius: 16,
-                borderWidth: 1.3,
-                borderColor: WarnaApp.wrBlue,
-                icon: Icon(
-                  Icons.lightbulb_outline_rounded,
-                  color: WarnaApp.wrOrange,
-                  size: 38.sp,
-                ),
-                shouldIconPulse: true,
-                boxShadows: [
-                  BoxShadow(
-                    color: WarnaApp.wrBlue.withValues(alpha: 0.15),
-                    blurRadius: 20,
-                    spreadRadius: 4,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-                duration: const Duration(seconds: 3),
-                animationDuration: const Duration(milliseconds: 500),
-                forwardAnimationCurve: Curves.easeOutBack,
-              );
-            },
+            onPressed: _showHomeTutorial,
             icon: Icon(Icons.info_outline_rounded, size: 32),
             color: WarnaApp.wrBlue,
             splashRadius: 24,

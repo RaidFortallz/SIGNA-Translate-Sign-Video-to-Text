@@ -5,19 +5,24 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
+import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 
 class TrimVideoController extends GetxController {
   late final Player player;
   late final VideoController videoController;
 
-  var isPlaying        = false.obs;
-  var isSaving         = false.obs;
-  var duration         = Duration.zero.obs;
-  var position         = Duration.zero.obs;
+  var isPlaying = false.obs;
+  var isSaving = false.obs;
+  var duration = Duration.zero.obs;
+  var position = Duration.zero.obs;
 
   // Multi-segment
-  var segments         = <RangeValues>[const RangeValues(0.0, 1.0)].obs;
+  var segments = <RangeValues>[const RangeValues(0.0, 1.0)].obs;
   var activeSegmentIdx = 0.obs;
+
+  final ScrollController segmentScrollController = ScrollController();
+
+  RangeValues _prevSegment = const RangeValues(0.0, 1.0);
 
   String _videoPath = '';
 
@@ -26,9 +31,22 @@ class TrimVideoController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _videoPath = Get.arguments as String;
-    player     = Player();
+    player = Player();
     videoController = VideoController(player);
+
+    final String? rawArg = Get.arguments as String?;
+    final tutCtrl = Get.find<AppTutorialController>();
+
+    // Tutorial mode atau sentinel argument skip load video
+    if (tutCtrl.isTutorialMode.value ||
+        rawArg == null ||
+        rawArg.isEmpty ||
+        rawArg == '__tutorial__') {
+      _videoPath = '';
+      return; // Player aktif tapi kosong, Video widget tampil hitam
+    }
+
+    _videoPath = rawArg;
     _loadVideo(_videoPath);
     _setupListeners();
   }
@@ -58,8 +76,8 @@ class TrimVideoController extends GetxController {
   }
 
   void _seekToActiveStart() {
-    final int startMs =
-        (activeSegment.start * duration.value.inMilliseconds).round();
+    final int startMs = (activeSegment.start * duration.value.inMilliseconds)
+        .round();
     player.seek(Duration(milliseconds: startMs));
   }
 
@@ -67,10 +85,10 @@ class TrimVideoController extends GetxController {
     if (isPlaying.value) {
       player.pause();
     } else {
-      final int posMs   = position.value.inMilliseconds;
+      final int posMs = position.value.inMilliseconds;
       final int totalMs = duration.value.inMilliseconds;
       final int startMs = (activeSegment.start * totalMs).round();
-      final int endMs   = (activeSegment.end   * totalMs).round();
+      final int endMs = (activeSegment.end * totalMs).round();
       if (posMs < startMs || posMs >= endMs) _seekToActiveStart();
       player.play();
     }
@@ -80,42 +98,64 @@ class TrimVideoController extends GetxController {
 
   void addSegment() {
     if (segments.length >= 10) {
-      Get.snackbar('Batas Segmen', 'Maksimal 10 segmen.',
-          backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
-          colorText: WarnaApp.wrWhite,
-          duration: const Duration(seconds: 2));
+      Get.snackbar(
+        'Batas Segmen',
+        'Maksimal 10 segmen.',
+        backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
+        colorText: WarnaApp.wrWhite,
+        duration: const Duration(seconds: 2),
+      );
       return;
     }
 
     player.pause();
 
-    final double lastEnd =
-        segments.map((s) => s.end).reduce((a, b) => a > b ? a : b);
+    final double lastEnd = segments
+        .map((s) => s.end)
+        .reduce((a, b) => a > b ? a : b);
 
     if (lastEnd >= 0.94) {
-      Get.snackbar('Tidak Ada Ruang', 'Tidak cukup ruang di akhir video.',
-          backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
-          colorText: WarnaApp.wrWhite,
-          duration: const Duration(seconds: 2));
+      Get.snackbar(
+        'Tidak Ada Ruang',
+        'Tidak cukup ruang di akhir video.',
+        backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
+        colorText: WarnaApp.wrWhite,
+        duration: const Duration(seconds: 2),
+      );
       return;
     }
 
     final double newStart = (lastEnd + 0.02).clamp(0.0, 0.94);
-    final double newEnd   = (newStart + 0.15).clamp(newStart + 0.04, 1.0);
+    final double newEnd = (newStart + 0.15).clamp(newStart + 0.04, 1.0);
 
     segments.add(RangeValues(newStart, newEnd));
     activeSegmentIdx.value = segments.length - 1;
 
+    _prevSegment = RangeValues(newStart, newEnd);
+
     final int ms = (newStart * duration.value.inMilliseconds).round();
     player.seek(Duration(milliseconds: ms));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (segmentScrollController.hasClients) {
+        segmentScrollController.animateTo(
+          segmentScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void removeSegment(int idx) {
     if (segments.length <= 1) {
-      Get.snackbar('Minimal 1 Segmen', 'Harus ada setidaknya satu segmen.',
-          backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
-          colorText: WarnaApp.wrWhite,
-          duration: const Duration(seconds: 2));
+      Get.snackbar(
+        'Minimal 1 Segmen',
+        'Harus ada setidaknya satu segmen.',
+        backgroundColor: WarnaApp.wrRed.withValues(alpha: 0.9),
+        colorText: WarnaApp.wrWhite,
+        duration: const Duration(seconds: 2),
+      );
       return;
     }
 
@@ -124,6 +164,7 @@ class TrimVideoController extends GetxController {
     if (activeSegmentIdx.value >= segments.length) {
       activeSegmentIdx.value = segments.length - 1;
     }
+    _prevSegment = activeSegment;
     _seekToActiveStart();
   }
 
@@ -131,14 +172,22 @@ class TrimVideoController extends GetxController {
     if (idx < 0 || idx >= segments.length) return;
     player.pause();
     activeSegmentIdx.value = idx;
+    _prevSegment = activeSegment;
     _seekToActiveStart();
   }
 
   void updateActiveSegment(RangeValues values) {
+    final double seekRatio = (values.start != _prevSegment.start)
+        ? values.start
+        : values.end;
+
+    _prevSegment = values;
+
     final List<RangeValues> updated = List<RangeValues>.from(segments);
     updated[activeSegmentIdx.value] = values;
     segments.assignAll(updated);
-    final int ms = (values.start * duration.value.inMilliseconds).round();
+
+    final int ms = (seekRatio * duration.value.inMilliseconds).round();
     player.seek(Duration(milliseconds: ms));
   }
 
@@ -167,6 +216,7 @@ class TrimVideoController extends GetxController {
   @override
   void onClose() {
     player.dispose();
+    segmentScrollController.dispose();
     super.onClose();
   }
 }

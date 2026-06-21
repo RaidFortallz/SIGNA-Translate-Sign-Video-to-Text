@@ -7,7 +7,9 @@ import 'package:get/get.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
+import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -29,10 +31,130 @@ class _CameraPageState extends State<CameraPage> {
 
   late SensorConfig _sensorConfig;
 
+  final GlobalKey _flashKey = GlobalKey();
+  final GlobalKey _switchKey = GlobalKey();
+  final GlobalKey _recordKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _initSensorConfig();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final String? arg = Get.arguments as String?;
+      if (arg == '__tutorial__') {
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (mounted) _showCameraTutorial();
+        });
+      }
+    });
+  }
+
+  void _showCameraTutorial() {
+    final tutCtrl = Get.find<AppTutorialController>();
+    const total = 3;
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: 'cam_flash',
+          keyTarget: _flashKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 13,
+          paddingFocus: 8,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '⚡',
+                title: 'Lampu Flash',
+                description:
+                    'Ketuk untuk menyalakan/mematikan flash. Berguna saat merekam di kondisi pencahayaan yang redup.',
+                step: 1,
+                total: total,
+                alwaysShowNext: true,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'cam_switch',
+          keyTarget: _switchKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 13,
+          paddingFocus: 8,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🔄',
+                title: 'Ganti Kamera',
+                description:
+                    'Beralih antara kamera belakang dan kamera depan (selfie) sesuai kebutuhan merekam isyarat.',
+                step: 2,
+                total: total,
+                alwaysShowNext: true,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'cam_record',
+          keyTarget: _recordKey,
+          shape: ShapeLightFocus.Circle,
+          paddingFocus: 12,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🔴',
+                title: 'Tombol Rekam',
+                description:
+                    'Ketuk sekali untuk mulai merekam, ketuk lagi untuk berhenti. Pastikan gerakan isyarat berada dalam kotak panduan.',
+                step: 3,
+                total: total,
+                alwaysShowNext: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: WarnaApp.wrBlack,
+      opacityShadow: 0.85,
+      paddingFocus: 10,
+      focusAnimationDuration: const Duration(milliseconds: 350),
+      unFocusAnimationDuration: const Duration(milliseconds: 300),
+      alignSkip: Alignment.topRight,
+      skipWidget: Container(
+        margin: EdgeInsets.only(top: 52.h, right: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
+        decoration: BoxDecoration(
+          color: WarnaApp.wrWhite.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: WarnaApp.wrWhite.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: TextCustom(
+          "Lewati",
+          fontSize: 12,
+          color: WarnaApp.wrWhite,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onFinish: () {
+        Get.toNamed(RouteNames.trim, arguments: '__tutorial__');
+      },
+      onSkip: () {
+        tutCtrl.endTutorial();
+        Get.offAllNamed(RouteNames.main);
+        return true;
+      },
+    ).show(context: context);
   }
 
   void _initSensorConfig() {
@@ -277,10 +399,12 @@ class _CameraPageState extends State<CameraPage> {
                       else
                         const SizedBox(),
 
+                      //button flash
                       Row(
                         children: [
                           AwesomeOrientedWidget(
                             child: Container(
+                              key: _flashKey,
                               width: 46.w,
                               height: 46.h,
                               decoration: BoxDecoration(
@@ -303,8 +427,10 @@ class _CameraPageState extends State<CameraPage> {
                           ),
                           SizedBox(width: 18.w),
 
+                          //button switch kamera depan
                           AwesomeOrientedWidget(
                             child: Container(
+                              key: _switchKey,
                               width: 46.w,
                               height: 46.h,
                               decoration: BoxDecoration(
@@ -455,6 +581,7 @@ class _CameraPageState extends State<CameraPage> {
               _buildBottomControls(
                 isRecording: isRecording,
                 onRecordTap: onRecordTap ?? () {},
+                recordButtonKey: _recordKey,
               ),
             ],
           );
@@ -488,6 +615,7 @@ Widget _buildFlashButton(CameraState state) {
 Widget _buildBottomControls({
   required bool isRecording,
   required VoidCallback onRecordTap,
+  GlobalKey? recordButtonKey,
 }) {
   return Container(
     height: 160.h,
@@ -506,6 +634,7 @@ Widget _buildBottomControls({
         GestureDetector(
           onTap: onRecordTap,
           child: Container(
+            key: recordButtonKey,
             width: 70.w,
             height: 70.w,
             decoration: BoxDecoration(

@@ -21,7 +21,7 @@ class ResultPage extends StatelessWidget {
         final isLoading = controller.isLoading.value;
         final data = controller.currentResult.value;
 
-        // ── Loading 
+        // ── Loading
         if (isLoading) {
           return Container(
             color: WarnaApp.wrWhite,
@@ -43,11 +43,21 @@ class ResultPage extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 8.h),
-                  TextCustom(
-                    "Mohon tunggu sebentar.",
-                    fontSize: 14,
-                    color: WarnaApp.wrGrey,
-                    textAlign: TextAlign.center,
+                  Obx(
+                    () => AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(opacity: animation, child: child),
+                      child: TextCustom(
+                        key: ValueKey(controller.progressMessage.value),
+                        controller.progressMessage.value.isEmpty
+                            ? 'Mohon tunggu sebentar.'
+                            : controller.progressMessage.value,
+                        fontSize: 14,
+                        color: WarnaApp.wrGrey,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -149,7 +159,7 @@ class ResultPage extends StatelessWidget {
                     children: [
                       _InfoRow(
                         icon: Icons.percent_rounded,
-                        label: "Tingkat Akurasi AI",
+                        label: "Tingkat Keyakinan Model",
                         value: "${data.accuracy.toStringAsFixed(1)}%",
                         valueColor: _accuracyColor(data.accuracy),
                       ),

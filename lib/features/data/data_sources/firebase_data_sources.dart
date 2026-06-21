@@ -36,22 +36,41 @@ class FirebaseDataSources {
 
   Future<List<Map<String, dynamic>>> fetchFromFirestore(String uid) async {
     try {
-      QuerySnapshot snapshot = await firestore
-          .collection('users')
-          .doc(uid)
-          .collection('history')
-          .orderBy('timestamp', descending: true)
-          .get();
+      QuerySnapshot snapshot;
+
+      try {
+        snapshot = await firestore
+            .collection('users')
+            .doc(uid)
+            .collection('history')
+            .orderBy('timestamp', descending: true)
+            .get()
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        snapshot = await firestore
+            .collection('users')
+            .doc(uid)
+            .collection('history')
+            .orderBy('timestamp', descending: true)
+            .get(const GetOptions(source: Source.cache));
+      }
+
+      // QuerySnapshot snapshot = await firestore
+      //     .collection('users')
+      //     .doc(uid)
+      //     .collection('history')
+      //     .orderBy('timestamp', descending: true)
+      //     .get();
 
       return snapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
+        final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
-
         return data;
       }).toList();
     } catch (e) {
-      throw Exception("Gagal mengambil data riwayat!: $e");
+      // throw Exception("Gagal mengambil data riwayat!: $e");
+      print("fetchFromFirestore gagal: $e");
+      return [];
     }
   }
 
@@ -72,5 +91,24 @@ class FirebaseDataSources {
     } catch (e) {
       throw Exception("Tidak dapat menghapus: $e");
     }
+  }
+
+  void saveToFirestoreBackground(Map<String, dynamic> data) {
+    final String? uid = auth.currentUser?.uid;
+    if (uid == null) {
+      print("saveToFirestoreBackground: user null, skip");
+      return;
+    }
+
+    final Map<String, dynamic> dataToSave = Map.from(data);
+    dataToSave['timestamp'] = FieldValue.serverTimestamp();
+
+    firestore
+        .collection('users')
+        .doc(uid)
+        .collection('history')
+        .add(dataToSave)
+        .then((_) => print("Firestore sync berhasil"))
+        .catchError((e) => print("Firestore background save: $e"));
   }
 }

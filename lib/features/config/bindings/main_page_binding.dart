@@ -9,6 +9,7 @@ import 'package:signa_video_to_text/features/domain/usecases/get_history_usecase
 import 'package:signa_video_to_text/features/domain/usecases/translate_video_usecase.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/main_page_controller.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
+import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 
 class MainPageBinding implements Bindings {
   @override
@@ -41,5 +42,7 @@ class MainPageBinding implements Bindings {
         deleteUC: Get.find<DeleteHistoryUsecase>(),
       ),
     );
+
+    Get.put(AppTutorialController());
   }
 }

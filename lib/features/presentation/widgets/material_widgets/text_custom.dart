@@ -8,7 +8,8 @@ class TextCustom extends StatelessWidget {
   final Color color;
   final TextAlign textAlign;
   final double letterSpacing;
-  
+  final double height;
+
   const TextCustom(
     this.text, {
     super.key,
@@ -17,6 +18,7 @@ class TextCustom extends StatelessWidget {
     this.color = WarnaApp.wrTextBlack,
     this.textAlign = TextAlign.left,
     this.letterSpacing = 0,
+    this.height = 0,
   });
 
   @override
@@ -29,6 +31,7 @@ class TextCustom extends StatelessWidget {
         fontWeight: fontWeight,
         color: color,
         letterSpacing: letterSpacing,
+        height: height,
       ),
     );
   }

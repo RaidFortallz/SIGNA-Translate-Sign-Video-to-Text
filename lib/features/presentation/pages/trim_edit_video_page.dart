@@ -5,12 +5,210 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/trim_video_controller.dart';
+import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
-class TrimEditVideoPage extends StatelessWidget {
-  final TrimVideoController controller = Get.put(TrimVideoController());
+class TrimEditVideoPage extends StatefulWidget {
+  const TrimEditVideoPage({super.key});
 
-  TrimEditVideoPage({super.key});
+  @override
+  State<TrimEditVideoPage> createState() => _TrimEditVideoPageState();
+}
+
+class _TrimEditVideoPageState extends State<TrimEditVideoPage> {
+  late final TrimVideoController controller;
+
+  final GlobalKey _videoPreviewKey = GlobalKey();
+  final GlobalKey _progressBarKey = GlobalKey();
+  final GlobalKey _segmentChipKey = GlobalKey();
+  final GlobalKey _addSegmentKey = GlobalKey();
+  final GlobalKey _sliderKey = GlobalKey();
+  final GlobalKey _translateKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(TrimVideoController());
+
+    final tutCtrl = Get.find<AppTutorialController>();
+    if (tutCtrl.isTutorialMode.value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) _showTrimTutorial();
+        });
+      });
+    }
+  }
+
+  void _showTrimTutorial() {
+    final tutCtrl = Get.find<AppTutorialController>();
+    const total = 6;
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: 'trim_preview',
+          keyTarget: _videoPreviewKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 16,
+          paddingFocus: 6,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🎬',
+                title: 'Preview Video',
+                description:
+                    'Area ini menampilkan video rekaman kamu. Ketuk ▶ untuk memutar dan cek gerakan isyarat yang sudah direkam.',
+                step: 1,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'trim_progress',
+          keyTarget: _progressBarKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 4,
+          paddingFocus: 10,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '📊',
+                title: 'Progress Bar Segmen',
+                description:
+                    'Bar ini menampilkan posisi semua segmen dalam video. Merah = segmen aktif yang sedang diedit, Biru = segmen lainnya. Garis putih = posisi putar saat ini.',
+                step: 2,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'trim_chip',
+          keyTarget: _segmentChipKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 20,
+          paddingFocus: 8,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🏷️',
+                title: 'Marker Gerakan (Kata)',
+                description:
+                    'Setiap chip adalah satu kata/gerakan isyarat. Ketuk untuk memilih dan mengatur batas waktu gerakan tersebut. Tombol × untuk menghapus segmen.',
+                step: 3,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'trim_add',
+          keyTarget: _addSegmentKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 20,
+          paddingFocus: 8,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '➕',
+                title: 'Tambah Gerakan Baru',
+                description:
+                    'Jika video berisi lebih dari satu kata isyarat, ketuk ini untuk menambah segmen baru. Tiap segmen akan diterjemahkan secara terpisah lalu digabung jadi kalimat.',
+                step: 4,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'trim_slider',
+          keyTarget: _sliderKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 8,
+          paddingFocus: 10,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '⏱️',
+                title: 'Atur Rentang Waktu',
+                description:
+                    'Geser ujung kiri untuk waktu mulai gerakan, ujung kanan untuk waktu selesai. Preview video akan mengikuti posisi slider secara real-time.',
+                step: 5,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'trim_translate',
+          keyTarget: _translateKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 14,
+          paddingFocus: 6,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => AppTutorialController.buildCard(
+                ctrl: ctrl,
+                emoji: '🤖',
+                title: 'Terjemahkan Isyarat',
+                description:
+                    'Setelah semua segmen ditandai dan diatur, ketuk tombol ini. Model AI SIGNA akan memproses setiap gerakan dan menghasilkan terjemahan teks BISINDO.',
+                step: 6,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: WarnaApp.wrBlack,
+      opacityShadow: 0.85,
+      paddingFocus: 8,
+      focusAnimationDuration: const Duration(milliseconds: 350),
+      unFocusAnimationDuration: const Duration(milliseconds: 300),
+      alignSkip: Alignment.topRight,
+      skipWidget: Container(
+        margin: EdgeInsets.only(top: 52.h, right: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
+        decoration: BoxDecoration(
+          color: WarnaApp.wrWhite.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: WarnaApp.wrWhite.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: TextCustom(
+          "Lewati",
+          fontSize: 12,
+          color: WarnaApp.wrWhite,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onFinish: () {
+        tutCtrl.endTutorial();
+        Get.offAllNamed(RouteNames.main);
+      },
+      onSkip: () {
+        tutCtrl.endTutorial();
+        Get.offAllNamed(RouteNames.main);
+        return true;
+      },
+    ).show(context: context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +262,7 @@ class TrimEditVideoPage extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                 child: ClipRRect(
+                  key: _videoPreviewKey,
                   borderRadius: BorderRadius.circular(16),
                   child: Stack(
                     alignment: Alignment.center,
@@ -195,6 +394,7 @@ class TrimEditVideoPage extends StatelessWidget {
 
                     // ── Progress bar: semua segmen ditampilkan ─────────────────────
                     LayoutBuilder(
+                      key: _progressBarKey,
                       builder: (context, constraints) {
                         final double w = constraints.maxWidth;
                         return Stack(
@@ -256,12 +456,14 @@ class TrimEditVideoPage extends StatelessWidget {
                     // ── Segment chips + tombol tambah ──────────────────────────────
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
+                      controller: controller.segmentScrollController,
                       child: Row(
                         children: [
                           ...controller.segments.asMap().entries.map((entry) {
                             final int idx = entry.key;
                             final bool isActive = idx == activeIdx;
                             return GestureDetector(
+                              key: idx == 0 ? _segmentChipKey : null,
                               onTap: () => controller.setActiveSegment(idx),
                               child: Container(
                                 margin: EdgeInsets.only(right: 8.w),
@@ -324,6 +526,7 @@ class TrimEditVideoPage extends StatelessWidget {
 
                           // Tombol + tambah segmen
                           GestureDetector(
+                            key: _addSegmentKey,
                             onTap: controller.addSegment,
                             child: Container(
                               padding: EdgeInsets.symmetric(
@@ -370,6 +573,7 @@ class TrimEditVideoPage extends StatelessWidget {
 
                     // ── RangeSlider untuk segmen aktif ─────────────────────────────
                     SliderTheme(
+                      key: _sliderKey,
                       data: SliderThemeData(
                         activeTrackColor: WarnaApp.wrRed,
                         inactiveTrackColor: WarnaApp.wrWhite.withValues(
@@ -392,13 +596,6 @@ class TrimEditVideoPage extends StatelessWidget {
                         max: 1.0,
                         onChanged: controller.updateActiveSegment,
                         onChangeStart: (_) => controller.player.pause(),
-                        onChangeEnd: (values) {
-                          final int ms =
-                              (values.start *
-                                      controller.duration.value.inMilliseconds)
-                                  .round();
-                          controller.player.seek(Duration(milliseconds: ms));
-                        },
                       ),
                     ),
 
@@ -446,6 +643,7 @@ class TrimEditVideoPage extends StatelessWidget {
               () => Padding(
                 padding: EdgeInsets.only(left: 16.w, right: 16.w, bottom: 28.h),
                 child: ElevatedButton(
+                  key: _translateKey,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: WarnaApp.wrBlue,
                     disabledBackgroundColor: WarnaApp.wrBlue.withValues(

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -19,8 +19,7 @@ class TfliteDataSources {
   // ── Konstanta sesuai preprocessing Python (run10 main GRU.py) ──
   static const int numFrames = 16;
   static const int imgSize = 128;
-  static const int landmarkDim =
-      153; // 9 pose*3 + 21 leftHand*3 + 21 rightHand*3
+  static const int landmarkDim = 153; // 9 pose*3 + 21 leftHand*3 + 21 rightHand*3
   static const int featureDim = 306; // landmarkDim + velocity(landmarkDim)
 
   // POSE_IDS Python: [0,11,12,13,14,15,16,23,24]
@@ -178,19 +177,13 @@ class TfliteDataSources {
     final List<int>? cropBox = await _getFixedCrop(sampledPaths.first);
 
     // ── Terapkan crop yang SAMA ke semua frame ──
-    final List<String> result = await compute(_batchCropFrames, {
-      'inputPaths': sampledPaths,
-      'outputDir': cropDir.path,
-      'cropBox': cropBox,
-      'imgSize': imgSize,
-    });
-
-    // for (int i = 0; i < sampledPaths.length; i++) {
-    //   final String outPath =
-    //       '${cropDir.path}/crop_${i.toString().padLeft(3, '0')}.jpg';
-    //   await _applyFixedCrop(sampledPaths[i], outPath, cropBox);
-    //   result.add(outPath);
-    // }
+    final List<String> result = [];
+    for (int i = 0; i < sampledPaths.length; i++) {
+      final String outPath =
+          '${cropDir.path}/crop_${i.toString().padLeft(3, '0')}.jpg';
+      await _applyFixedCrop(sampledPaths[i], outPath, cropBox);
+      result.add(outPath);
+    }
 
     print("   Cropped frames: ${result.length}");
     return result;
@@ -261,66 +254,66 @@ class TfliteDataSources {
   }
 
   // fixed_shoulder_crop: crop (+padding kalau keluar batas) → resize 128x128
-  // Future<void> _applyFixedCrop(
-  //   String inputPath,
-  //   String outputPath,
-  //   List<int>? cropBox,
-  // ) async {
-  //   final Uint8List bytes = await File(inputPath).readAsBytes();
-  //   final img.Image? decoded = img.decodeImage(bytes);
-  //   if (decoded == null) return;
+  Future<void> _applyFixedCrop(
+    String inputPath,
+    String outputPath,
+    List<int>? cropBox,
+  ) async {
+    final Uint8List bytes = await File(inputPath).readAsBytes();
+    final img.Image? decoded = img.decodeImage(bytes);
+    if (decoded == null) return;
 
-  //   final int w = decoded.width;
-  //   final int h = decoded.height;
+    final int w = decoded.width;
+    final int h = decoded.height;
 
-  //   img.Image cropped;
+    img.Image cropped;
 
-  //   if (cropBox != null) {
-  //     final int padLeft = max(0, -cropBox[0]);
-  //     final int padTop = max(0, -cropBox[1]);
-  //     final int padRight = max(0, cropBox[2] - w);
-  //     final int padBottom = max(0, cropBox[3] - h);
+    if (cropBox != null) {
+      final int padLeft = max(0, -cropBox[0]);
+      final int padTop = max(0, -cropBox[1]);
+      final int padRight = max(0, cropBox[2] - w);
+      final int padBottom = max(0, cropBox[3] - h);
 
-  //     final int x1 = max(0, cropBox[0]);
-  //     final int y1 = max(0, cropBox[1]);
-  //     final int x2 = min(w, cropBox[2]);
-  //     final int y2 = min(h, cropBox[3]);
+      final int x1 = max(0, cropBox[0]);
+      final int y1 = max(0, cropBox[1]);
+      final int x2 = min(w, cropBox[2]);
+      final int y2 = min(h, cropBox[3]);
 
-  //     cropped = img.copyCrop(
-  //       decoded,
-  //       x: x1,
-  //       y: y1,
-  //       width: x2 - x1,
-  //       height: y2 - y1,
-  //     );
+      cropped = img.copyCrop(
+        decoded,
+        x: x1,
+        y: y1,
+        width: x2 - x1,
+        height: y2 - y1,
+      );
 
-  //     if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-  //       cropped = img.copyExpandCanvas(
-  //         cropped,
-  //         newWidth: cropped.width + padLeft + padRight,
-  //         newHeight: cropped.height + padTop + padBottom,
-  //         position: img.ExpandCanvasPosition.topLeft,
-  //         backgroundColor: img.ColorRgb8(0, 0, 0),
-  //       );
-  //     }
-  //   } else {
-  //     final int size = min(w, h);
-  //     cropped = img.copyCrop(
-  //       decoded,
-  //       x: (w - size) ~/ 2,
-  //       y: (h - size) ~/ 2,
-  //       width: size,
-  //       height: size,
-  //     );
-  //   }
+      if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+        cropped = img.copyExpandCanvas(
+          cropped,
+          newWidth: cropped.width + padLeft + padRight,
+          newHeight: cropped.height + padTop + padBottom,
+          position: img.ExpandCanvasPosition.topLeft,
+          backgroundColor: img.ColorRgb8(0, 0, 0),
+        );
+      }
+    } else {
+      final int size = min(w, h);
+      cropped = img.copyCrop(
+        decoded,
+        x: (w - size) ~/ 2,
+        y: (h - size) ~/ 2,
+        width: size,
+        height: size,
+      );
+    }
 
-  //   final img.Image resized = img.copyResize(
-  //     cropped,
-  //     width: imgSize,
-  //     height: imgSize,
-  //   );
-  //   await File(outputPath).writeAsBytes(img.encodeJpg(resized, quality: 90));
-  // }
+    final img.Image resized = img.copyResize(
+      cropped,
+      width: imgSize,
+      height: imgSize,
+    );
+    await File(outputPath).writeAsBytes(img.encodeJpg(resized, quality: 90));
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // STEP 2 — Replikasi landmark_to_vector():
@@ -482,78 +475,4 @@ class TfliteDataSources {
   }
 
   void close() => interpreter?.close();
-}
-
-Future<List<String>> _batchCropFrames(Map<String, dynamic> params) async {
-  final List<String> inputPaths = List<String>.from(params['inputPaths']);
-  final String outputDir = params['outputDir'] as String;
-  final List<int>? cropBox = (params['cropBox'] as List<dynamic>?)?.cast<int>();
-  final int imgSize = params['imgSize'] as int;
-
-  final List<String> results = [];
-
-  for (int i = 0; i < inputPaths.length; i++) {
-    final String outPath =
-        '$outputDir/crop_${i.toString().padLeft(3, '0')}.jpg';
-    try {
-      final Uint8List bytes = await File(inputPaths[i]).readAsBytes();
-      final img.Image? decoded = img.decodeImage(bytes);
-      if (decoded == null) continue;
-
-      final int w = decoded.width;
-      final int h = decoded.height;
-      img.Image cropped;
-
-      if (cropBox != null) {
-        final int padLeft = max(0, -cropBox[0]);
-        final int padTop = max(0, -cropBox[1]);
-        final int padRight = max(0, cropBox[2] - w);
-        final int padBottom = max(0, cropBox[3] - h);
-
-        final int x1 = max(0, cropBox[0]);
-        final int y1 = max(0, cropBox[1]);
-        final int x2 = min(w, cropBox[2]);
-        final int y2 = min(h, cropBox[3]);
-
-        cropped = img.copyCrop(
-          decoded,
-          x: x1,
-          y: y1,
-          width: x2 - x1,
-          height: y2 - y1,
-        );
-
-        if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-          cropped = img.copyExpandCanvas(
-            cropped,
-            newWidth: cropped.width + padLeft + padRight,
-            newHeight: cropped.height + padTop + padBottom,
-            position: img.ExpandCanvasPosition.topLeft,
-            backgroundColor: img.ColorRgb8(0, 0, 0),
-          );
-        }
-      } else {
-        final int size = min(w, h);
-        cropped = img.copyCrop(
-          decoded,
-          x: (w - size) ~/ 2,
-          y: (h - size) ~/ 2,
-          width: size,
-          height: size,
-        );
-      }
-
-      final img.Image resized = img.copyResize(
-        cropped,
-        width: imgSize,
-        height: imgSize,
-      );
-      await File(outPath).writeAsBytes(img.encodeJpg(resized, quality: 90));
-      results.add(outPath);
-    } catch (e) {
-      print('   Frame $i crop error: $e');
-    }
-  }
-
-  return results;
 }

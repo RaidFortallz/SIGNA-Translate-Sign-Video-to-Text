@@ -96,10 +96,14 @@ class Splashscreen extends StatelessWidget {
                             ),
                           ),
                           child: Center(
-                            child: Image.asset(
-                              "assets/icon/logo_foreground.png",
-                              height: 58,
-                              color: Colors.white,
+                            child: Transform.scale(
+                              scale: 1.8,
+                              child: Image.asset(
+                                "assets/icon/logo_foreground.png",
+                                height: 100,
+                                width: 100,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
@@ -125,7 +129,7 @@ class Splashscreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                            SizedBox(height: 8),
+                            SizedBox(width: 8),
                             Container(
                               width: 60,
                               height: 1.5,
@@ -134,7 +138,7 @@ class Splashscreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                            SizedBox(height: 8),
+                            SizedBox(width: 8),
                             Container(
                               width: 20,
                               height: 1.5,

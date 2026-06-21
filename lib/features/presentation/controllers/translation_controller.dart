@@ -31,6 +31,7 @@ class TranslationController extends GetxController {
   var currentResult = Rxn<TranslationEntity>();
   var videoSource = 'rekam'.obs;
   var isFrontCamera = false.obs;
+  var progressMessage = ''.obs;
 
   @override
   void onInit() {
@@ -90,6 +91,7 @@ class TranslationController extends GetxController {
     try {
       isLoading.value = true;
       currentResult.value = null;
+      progressMessage.value = 'Mempersiapkan video...';
 
       // 1. Simpan video asli ke permanent path (untuk preview di result page)
       final directory = await getApplicationSupportDirectory();
@@ -130,6 +132,11 @@ class TranslationController extends GetxController {
       String? lastError;
 
       for (int i = 0; i < segments.length; i++) {
+        progressMessage.value = segments.length == 1
+            ? 'Menganalisis gerakan...'
+            : 'Memproses gerakan ${i + 1} dari ${segments.length}...';
+        await Future.delayed(Duration.zero);
+
         final RangeValues seg = segments[i];
         final Duration segStart = Duration(
           milliseconds: (seg.start * totalDurationMs).round(),
@@ -168,7 +175,7 @@ class TranslationController extends GetxController {
           confidences.add(confidence);
           print("Segmen ${i + 1}: $label (${confidence.toStringAsFixed(1)}%)");
         } catch (e) {
-          print("   ❌ Segmen ${i + 1} inferensi gagal: $e");
+          print("Segmen ${i + 1} inferensi gagal: $e");
           lastError = e.toString();
         } finally {
           final File segFile = File(segTempPath);
@@ -192,6 +199,9 @@ class TranslationController extends GetxController {
         "(conf avg: ${avgConfidence.toStringAsFixed(1)}%)",
       );
 
+      progressMessage.value = 'Menyimpan hasil...';
+      await Future.delayed(Duration.zero);
+
       // 3. Simpan ke Firestore via repository
       final repo = Get.find<ITranslationRepository>();
       final entity = await repo.saveResult(
@@ -201,12 +211,19 @@ class TranslationController extends GetxController {
       );
 
       currentResult.value = entity;
-      await loadHistory();
+      // await loadHistory();
+
+      if (!historyList.any((h) => h.id == entity.id)) {
+        historyList.insert(0, entity);
+      }
+
+      Future.delayed(const Duration(seconds: 3), _refreshHistoryBackground);
     } catch (e) {
       Get.snackbar('Error Proses', e.toString());
     } finally {
       isLoading.value = false;
       isFrontCamera.value = false;
+      progressMessage.value = '';
     }
   }
 
@@ -313,5 +330,14 @@ class TranslationController extends GetxController {
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     final ms = d.inMilliseconds.remainder(1000).toString().padLeft(3, '0');
     return '$h:$m:$s.$ms';
+  }
+
+  Future<void> _refreshHistoryBackground() async {
+    try {
+      final data = await historyUC.execute();
+      historyList.assignAll(data);
+    } catch (e) {
+      print("Background history refresh: $e");
+    }
   }
 }

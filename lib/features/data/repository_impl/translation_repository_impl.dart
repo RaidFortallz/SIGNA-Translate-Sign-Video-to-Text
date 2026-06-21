@@ -51,7 +51,7 @@ class TranslationRepositoryImpl implements ITranslationRepository {
       videoPath: videoPath,
       timestamp: DateTime.now(),
     );
-    await clouSource.saveToFirestore(newTransltaion.toJson());
+     clouSource.saveToFirestore(newTransltaion.toJson());
     return newTransltaion.toEntity();
   }
 

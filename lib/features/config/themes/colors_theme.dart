@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 abstract class WarnaApp {
   static const Color wrBlue = Color(0xFF2567E8); 
+  static const Color wrBlue2 = Color(0xFF1245C5); 
   static const Color wrBody = Color(0xFFF6F8FA);
   static const Color wrTextBlack = Color(0xFF1A1C1E);
+  static const Color wrBlack = Color(0xFF000000);
   static const Color wrWhite = Color(0xFFFFFFFF);
   static const Color wrOrange = Color(0xFFFF9800);
   static const Color wrOrangeLight = Color(0xFFFFE0B2);
