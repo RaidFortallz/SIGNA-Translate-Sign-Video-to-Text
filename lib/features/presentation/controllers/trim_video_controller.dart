@@ -24,6 +24,12 @@ class TrimVideoController extends GetxController {
 
   RangeValues _prevSegment = const RangeValues(0.0, 1.0);
 
+  var isDragging = false.obs;
+  var dragSeekRatio = 0.0.obs;
+
+  void startDragging() => isDragging.value = true;
+  void stopDragging()  => isDragging.value = false;
+
   String _videoPath = '';
 
   RangeValues get activeSegment => segments[activeSegmentIdx.value];
@@ -182,6 +188,7 @@ class TrimVideoController extends GetxController {
         : values.end;
 
     _prevSegment = values;
+    dragSeekRatio.value = seekRatio;
 
     final List<RangeValues> updated = List<RangeValues>.from(segments);
     updated[activeSegmentIdx.value] = values;

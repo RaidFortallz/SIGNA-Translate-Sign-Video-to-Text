@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffprobe_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/media_information.dart';
 import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -52,6 +54,26 @@ class TranslationController extends GetxController {
         Get.defaultDialog(
           title: "Format Tidak Didukung",
           middleText: "Harap masukkan video dengan format .mp4",
+          textConfirm: "OK",
+          confirmTextColor: WarnaApp.wrWhite,
+          onConfirm: () => Get.back(),
+        );
+        return;
+      }
+
+      // cek durasi
+      final MediaInformation? info = await FFprobeKit.getMediaInformation(
+        videoPath,
+      ).then((s) => s.getMediaInformation());
+
+      final double durationSec =
+          double.tryParse(info?.getDuration() ?? '0') ?? 0.0;
+
+      if (durationSec < 2.0) {
+        Get.defaultDialog(
+          title: "Durasi Tidak Mencukupi",
+          middleText:
+              "Video yang dipilih terlalu singkat untuk diproses. Pilih video dengan durasi yang lebih panjang.",
           textConfirm: "OK",
           confirmTextColor: WarnaApp.wrWhite,
           onConfirm: () => Get.back(),
@@ -341,3 +363,4 @@ class TranslationController extends GetxController {
     }
   }
 }
+

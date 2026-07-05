@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:signa_video_to_text/features/config/routes/route_names.dart';
 import 'package:signa_video_to_text/features/config/themes/colors_theme.dart';
+import 'package:signa_video_to_text/features/presentation/controllers/translation_controller.dart';
 import 'package:signa_video_to_text/features/presentation/controllers/trim_video_controller.dart';
 import 'package:signa_video_to_text/features/presentation/tutorial/app_tutorial_controller.dart';
 import 'package:signa_video_to_text/features/presentation/widgets/material_widgets/text_custom.dart';
@@ -224,7 +225,14 @@ class _TrimEditVideoPageState extends State<TrimEditVideoPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
-                    onTap: () => Get.offNamed(RouteNames.record),
+                    onTap: () {
+                      final transCtrl = Get.find<TranslationController>();
+                      if (transCtrl.videoSource.value == 'upload') {
+                        Get.offNamed(RouteNames.main);
+                      } else {
+                        Get.offNamed(RouteNames.record);
+                      }
+                    },
                     child: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 14.w,
@@ -351,6 +359,8 @@ class _TrimEditVideoPageState extends State<TrimEditVideoPage> {
                   (endDur - startDur).inMilliseconds / 1000.0;
               final double posRatio = totalMs == 0
                   ? 0.0
+                  : controller.isDragging.value
+                  ? controller.dragSeekRatio.value
                   : (controller.position.value.inMilliseconds / totalMs).clamp(
                       0.0,
                       1.0,
@@ -595,7 +605,13 @@ class _TrimEditVideoPageState extends State<TrimEditVideoPage> {
                         min: 0.0,
                         max: 1.0,
                         onChanged: controller.updateActiveSegment,
-                        onChangeStart: (_) => controller.player.pause(),
+                        onChangeStart: (_) {
+                          controller.player.pause();
+                          controller.startDragging();
+                        },
+                        onChangeEnd: (_) {
+                          controller.stopDragging();
+                        },
                       ),
                     ),
 
