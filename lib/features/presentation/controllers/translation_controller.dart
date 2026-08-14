@@ -363,4 +363,3 @@ class TranslationController extends GetxController {
     }
   }
 }
-

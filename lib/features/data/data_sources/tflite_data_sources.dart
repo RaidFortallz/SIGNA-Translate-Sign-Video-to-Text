@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffprobe_kit.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
@@ -16,7 +17,7 @@ class TfliteDataSources {
   List<String> labels = [];
   String? loadError;
 
-  // ── Konstanta sesuai preprocessing Python (run10 main GRU.py) ──
+  // Konstanta sesuai preprocessing Python (run10 main GRU.py)
   static const int numFrames = 16;
   static const int imgSize = 128;
   static const int landmarkDim =
@@ -76,37 +77,29 @@ class TfliteDataSources {
     }
 
     try {
-      // ── Step 1: Extract 16 frame + fixed shoulder crop ──
+      // Step 1: Extract 16 frame + fixed shoulder crop ──
       final List<String> croppedPaths = await _extractAndCropFrames(videoPath);
       if (croppedPaths.isEmpty) {
         return {'label': 'Gagal ekstrak frame', 'confidence': 0.0};
       }
 
-      // ── Step 2: Landmark extraction per frame → (16, 153) ──
+      // Step 2: Landmark extraction per frame → (16, 153) ──
       final List<List<double>> landmarkSeq = await _extractLandmarkSequence(
         croppedPaths,
       );
 
-      // ── Step 3: Velocity + concat + forward-fill → (16, 306) ──
+      // Step 3: Velocity + concat + forward-fill → (16, 306) ──
       final List<List<double>> featureSeq = _buildFeatureSequence(landmarkSeq);
 
       // Reshape ke [1, 16, 306]
       final List<dynamic> inputTensor = [featureSeq];
 
-      const int numRuns = 3;
-      final List<double> avgScores = List.filled(labels.length, 0.0);
-
-      for (int run = 0; run < numRuns; run++) {
-        final List<double> outputRaw = List.filled(labels.length, 0.0);
-        final List<List<double>> output = [outputRaw];
-        interpreter!.run(inputTensor, output);
-        for (int i = 0; i < labels.length; i++) {
-          avgScores[i] += output[0][i] / numRuns;
-        }
-      }
+      final List<double> outputRaw = List.filled(labels.length, 0.0);
+      final List<List<double>> output = [outputRaw];
+      interpreter!.run(inputTensor, output);
 
       final List<MapEntry<int, double>> ranked =
-          avgScores.asMap().entries.toList()
+          output[0].asMap().entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value));
 
       final int topIdx = ranked[0].key;
@@ -130,8 +123,6 @@ class TfliteDataSources {
 
   // ═══════════════════════════════════════════════════════════════════════
   // STEP 1 — Replikasi get_fixed_crop() + fixed_shoulder_crop():
-  // crop box dihitung SEKALI dari frame pertama (raw), lalu diterapkan
-  // ke semua 16 frame yang disampling.
   // ═══════════════════════════════════════════════════════════════════════
 
   Future<List<String>> _extractAndCropFrames(String videoPath) async {
@@ -144,35 +135,41 @@ class TfliteDataSources {
       await d.create();
     }
 
-    await FFmpegKit.execute('-i "$videoPath" "${rawDir.path}/frame_%04d.jpg"');
+    final probeSession = await FFprobeKit.getMediaInformation(videoPath);
+    final double durationSec =
+        double.tryParse(
+          probeSession.getMediaInformation()?.getDuration() ?? '0',
+        ) ??
+        2.0;
+
+    print("   Probe: ${durationSec.toStringAsFixed(2)}s");
+
+    final double extractFps = (numFrames / durationSec).clamp(0.1, 60.0);
+
+    await FFmpegKit.execute(
+      '-i "$videoPath" '
+      '-vf "fps=$extractFps,scale=480:-2" '
+      '-vframes $numFrames '
+      '-q:v 2 '
+      '"${rawDir.path}/frame_%04d.jpg"',
+    );
 
     final List<FileSystemEntity> rawFiles =
         rawDir.listSync().where((f) => f.path.endsWith('.jpg')).toList()
           ..sort((a, b) => a.path.compareTo(b.path));
 
-    print("   Raw frames: ${rawFiles.length}");
+    print("   Extracted: ${rawFiles.length} frames");
     if (rawFiles.isEmpty) return [];
 
-    // ── Replikasi: np.linspace(0, total-1, 16) → unique → astype(int) ──
-    final int totalFrames = rawFiles.length;
-    final Set<int> seen = {};
-    final List<int> sampledIdx = [];
-    for (int i = 0; i < numFrames; i++) {
-      final double t = i * (totalFrames - 1) / (numFrames - 1);
-      final int idx = t.toInt(); // truncate, sama seperti astype(int)
-      if (seen.add(idx)) sampledIdx.add(idx);
+    List<String> sampledPaths = rawFiles.map((f) => f.path).toList();
+    while (sampledPaths.length < numFrames) {
+      sampledPaths.add(sampledPaths.last);
     }
+    sampledPaths = sampledPaths.take(numFrames).toList();
 
-    final List<String> sampledPaths = sampledIdx
-        .map((idx) => rawFiles[idx].path)
-        .toList();
-
-    print("   Sampled unique frames: ${sampledPaths.length}/$numFrames");
-
-    // ── fixed_crop dihitung SEKALI dari frame pertama (raw, belum crop) ──
     final List<int>? cropBox = await _getFixedCrop(sampledPaths.first);
 
-    // ── Terapkan crop yang SAMA ke semua frame ──
+    // Batch crop di background isolate
     final List<String> result = await compute(_batchCropFrames, {
       'inputPaths': sampledPaths,
       'outputDir': cropDir.path,
@@ -226,7 +223,6 @@ class TfliteDataSources {
         ];
       }
 
-      // ML Kit sudah pixel coords di frame asli (= int(lm.x*w0) di Python)
       final int lx = lSh.x.toInt();
       final int ly = lSh.y.toInt();
       final int rx = rSh.x.toInt();
@@ -267,8 +263,6 @@ class TfliteDataSources {
     await poseDetector.close();
     await handDetector.dispose();
 
-    // ── Padding: kalau frame hasil sampling < 16, ulangi frame terakhir
-    // (sebelum velocity dihitung — sama seperti Python) ──
     while (sequence.length < numFrames) {
       sequence.add(List<double>.from(sequence.last));
     }
@@ -281,22 +275,27 @@ class TfliteDataSources {
     PoseDetector poseDetector,
     HandDetector handDetector,
   ) async {
-    final List<double> vector = [];
+    final Uint8List imgBytes = await File(framePath).readAsBytes();
 
+    final List<dynamic> detResults = await Future.wait([
+      poseDetector.processImage(InputImage.fromFilePath(framePath)),
+      handDetector.detect(imgBytes),
+    ]);
+
+    final List<Pose> poses = List<Pose>.from(detResults[0] as List);
+    final List<Hand> hands = List<Hand>.from(detResults[1] as List);
+
+    final List<double> vector = [];
     double centerX = 0.5;
     double centerY = 0.5;
     double shoulderWidth = 1.0;
 
-    final poses = await poseDetector.processImage(
-      InputImage.fromFilePath(framePath),
-    );
     final Pose? pose = poses.isNotEmpty ? poses.first : null;
 
     if (pose != null) {
       final lSh = pose.landmarks[PoseLandmarkType.leftShoulder];
       final rSh = pose.landmarks[PoseLandmarkType.rightShoulder];
       if (lSh != null && rSh != null) {
-        // Normalisasi pixel (0..128) → 0..1 sesuai skala MediaPipe Tasks
         final double lx = lSh.x / imgSize;
         final double ly = lSh.y / imgSize;
         final double rx = rSh.x / imgSize;
@@ -308,43 +307,39 @@ class TfliteDataSources {
       }
     }
 
-    // ── POSE: 9 landmark (POSE_IDS) × 3 (x,y,z) = 27 ──
+    // POSE: 9 landmark x 3 = 27
     if (pose != null) {
       for (final type in poseIds) {
         final lm = pose.landmarks[type];
         if (lm != null) {
-          final double xNorm = (lm.x / imgSize - centerX) / shoulderWidth;
-          final double yNorm = (lm.y / imgSize - centerY) / shoulderWidth;
-          final double zNorm = (lm.z / imgSize) / shoulderWidth;
-          vector.addAll([xNorm, yNorm, zNorm]);
+          vector.addAll([
+            (lm.x / imgSize - centerX) / shoulderWidth,
+            (lm.y / imgSize - centerY) / shoulderWidth,
+            (lm.z / imgSize) / shoulderWidth,
+          ]);
         } else {
           vector.addAll([0.0, 0.0, 0.0]);
         }
       }
     } else {
-      // Tidak ada pose → 27 nol (jaga FEATURE_DIM=306 selalu konsisten,
-      // lihat catatan di bawah soal perbedaan dgn fallback Python)
       vector.addAll(List.filled(27, 0.0));
     }
 
-    // ── HAND: leftHand(21×3) + rightHand(21×3) = 126 ──
+    // HAND: leftHand(21×3) + rightHand(21×3) = 126
     final List<double> leftHand = List.filled(63, 0.0);
     final List<double> rightHand = List.filled(63, 0.0);
 
     try {
-      final Uint8List imgBytes = await File(framePath).readAsBytes();
-      final List<Hand> hands = await handDetector.detect(imgBytes);
-
       for (final hand in hands.take(2)) {
         if (!hand.hasLandmarks) continue;
 
         final List<double> coords = [];
         for (final lm in hand.landmarks) {
-          final double xNorm = (lm.x / imgSize - centerX) / shoulderWidth;
-          final double yNorm = (lm.y / imgSize - centerY) / shoulderWidth;
-          // ASUMSI: hand_detection package punya field .z — lihat catatan
-          final double zNorm = (lm.z / imgSize) / shoulderWidth;
-          coords.addAll([xNorm, yNorm, zNorm]);
+          coords.addAll([
+            (lm.x / imgSize - centerX) / shoulderWidth,
+            (lm.y / imgSize - centerY) / shoulderWidth,
+            (lm.z / imgSize) / shoulderWidth,
+          ]);
         }
 
         if (hand.handedness == Handedness.left) {
